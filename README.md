@@ -34,6 +34,29 @@ VITE_SUPABASE_ANON_KEY=...
 
 **חשוב:** קובץ `.env` לא נכנס ל-git (מוגדר ב-`.gitignore`) — כל אחד שמריץ את הפרויקט מגדיר את שלו.
 
+## 3.1 יצירת משתמשת להתחברות (Login)
+
+המסך מתחבר מול Supabase Auth (`auth.users`), ומרחיב אותו עם `profiles` (שם, בית ספר, הרשאה). כדי שמשתמשת תוכל להתחבר:
+
+1. ב-Supabase: Authentication → Users → Add user, מזינות אימייל וסיסמה.
+2. ב-SQL Editor, מוסיפות שורת `profiles` תואמת (מחליפות את ה-UUID ב-id של המשתמשת שנוצרה, ואת ה-school_id בבית הספר הרלוונטי):
+
+```sql
+insert into profiles (id, school_id, full_name, permission_level)
+values ('<user-uuid-from-auth-users>', 1, 'שם מלא', 'full');
+```
+
+בלי שורה כזו, ההתחברות תצליח מול Auth אבל המערכת לא תדע לאיזה בית ספר/הרשאה המשתמשת שייכת.
+
+## 3.2 איפוס / הגדרת סיסמה מהמייל
+
+מסך "שכחת סיסמה" (`/forgot-password`) שולח מייל עם קישור, שמוביל למסך `/reset-password` שבו קובעים סיסמה חדשה. אותו מסך משמש גם למשתמשת שהוזמנה בפעם הראשונה (Invite).
+
+**חשוב להגדיר ב-Supabase** (אחרת הקישור במייל לא יחזור לאתר שלך):
+Authentication → URL Configuration → Redirect URLs — להוסיף שם:
+- `http://localhost:5173/reset-password` (לפיתוח מקומי)
+- `https://<הדומיין-שלך-בפרודקשן>/reset-password` (אחרי הפריסה ב-Vercel)
+
 ## 4. מבנה הפרויקט
 
 ```
