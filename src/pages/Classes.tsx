@@ -9,6 +9,7 @@ import {
   type ClassOverviewRow,
 } from '../hooks/useClasses'
 import { useAuth } from '../lib/AuthContext'
+import { useConfirm } from '../components/common/ConfirmProvider'
 
 const STATUS_LABEL: Record<ClassOverviewRow['status'], string> = {
   complete: 'הושלם',
@@ -33,6 +34,7 @@ export default function Classes() {
   const { data: classes, isLoading } = useClassesOverview(schoolId)
   const createClass = useCreateClass()
   const updateClass = useUpdateClass()
+  const confirm = useConfirm()
 
   const [showInactive, setShowInactive] = useState(false)
   const [modal, setModal] = useState<ModalMode | null>(null)
@@ -86,12 +88,12 @@ export default function Classes() {
     }
   }
 
-  function toggleActive(classRow: ClassOverviewRow) {
+  async function toggleActive(classRow: ClassOverviewRow) {
     if (!schoolId) return
     const confirmMsg = classRow.active
       ? `להשבית את כיתה ${classRow.name}? היא תוסר מרשימות הבחירה, וההיסטוריה שלה תישמר.`
       : `לשחזר את כיתה ${classRow.name}?`
-    if (!window.confirm(confirmMsg)) return
+    if (!(await confirm(confirmMsg))) return
 
     updateClass.mutate({ classId: classRow.id, schoolId, active: !classRow.active })
   }

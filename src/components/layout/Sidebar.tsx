@@ -11,6 +11,11 @@ const NAV_ITEMS = [
   { to: '/leave', label: 'ניהול חופשות' },
   { to: '/draft', label: 'טיוטת שיבוץ' },
   { to: '/opening', label: 'מערכת פתיחות' },
+] as const
+
+// קבוצת "ניהול" — הגדרות מערכת + מסכי בסיס (כיתות/עובדות) שמשמשים להקמה/תחזוקה, לא לעבודה היומיומית
+const MANAGEMENT_ITEMS = [
+  { to: '/management', label: 'הגדרות' },
   { to: '/staff', label: 'רשימת עובדות' },
   { to: '/classes', label: 'כיתות' },
 ] as const
@@ -33,6 +38,26 @@ export function Sidebar() {
             key={item.to}
             to={item.to}
             end={'end' in item ? item.end : false}
+            className={({ isActive }) =>
+              [
+                'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',
+                isActive
+                  ? 'bg-accent font-semibold text-white'
+                  : 'text-[#c7cad0] hover:bg-[#2a3340] hover:text-white',
+              ].join(' ')
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+
+        <div className="mb-1 mt-3 px-3 text-[11px] font-semibold uppercase tracking-wide text-[#6b7280]">
+          ניהול
+        </div>
+        {MANAGEMENT_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
             className={({ isActive }) =>
               [
                 'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',

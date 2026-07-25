@@ -15,6 +15,7 @@ import Opening from './pages/Opening'
 import SubstituteList from './pages/SubstituteList'
 import Classes from './pages/Classes'
 import Employees from './pages/Employees'
+import Management from './pages/Management'
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="substitutes" element={<SubstituteList />} />
         <Route path="staff" element={<Employees />} />
         <Route path="classes" element={<Classes />} />
+        <Route path="management" element={<Management />} />
       </Route>
     </Routes>
   )

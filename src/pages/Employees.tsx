@@ -10,6 +10,7 @@ import {
 } from '../hooks/useEmployees'
 import { EMPLOYEE_STATUS_LABELS, type EmployeeStatus } from '../types/schedule'
 import { useAuth } from '../lib/AuthContext'
+import { useConfirm } from '../components/common/ConfirmProvider'
 
 type ModalMode = { kind: 'create' } | { kind: 'edit'; employee: EmployeeWithType }
 
@@ -32,6 +33,7 @@ export default function Employees() {
   const { data: employeeTypes } = useEmployeeTypes(schoolId)
   const createEmployee = useCreateEmployee()
   const updateEmployee = useUpdateEmployee()
+  const confirm = useConfirm()
 
   const [showInactive, setShowInactive] = useState(false)
   const [modal, setModal] = useState<ModalMode | null>(null)
@@ -103,12 +105,12 @@ export default function Employees() {
     }
   }
 
-  function toggleActive(employee: EmployeeWithType) {
+  async function toggleActive(employee: EmployeeWithType) {
     if (!schoolId) return
     const confirmMsg = employee.active
       ? `להשבית את ${employee.full_name}? היא תוסר מרשימות הבחירה, וההיסטוריה שלה תישמר.`
       : `לשחזר את ${employee.full_name}?`
-    if (!window.confirm(confirmMsg)) return
+    if (!(await confirm(confirmMsg))) return
 
     updateEmployee.mutate({ employeeId: employee.id, schoolId, active: !employee.active })
   }
