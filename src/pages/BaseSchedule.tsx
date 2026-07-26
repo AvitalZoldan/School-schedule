@@ -3,7 +3,13 @@ import { useLocation } from 'react-router-dom'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useClasses } from '../hooks/useClasses'
 import { useEmployees } from '../hooks/useEmployees'
-import { useActiveTemplate, useTemplateSlots } from '../hooks/useSchedule'
+import {
+  useActiveTemplate,
+  useCleanupDuplicateSlots,
+  useSeedDefaultSlots,
+  useTemplateSlots,
+  findDuplicateSlotGroups,
+} from '../hooks/useSchedule'
 import { WeekGrid } from '../components/schedule/WeekGrid'
 
 export default function BaseSchedule() {
@@ -37,8 +43,14 @@ export default function BaseSchedule() {
 
   const { data: template, isLoading: templateLoading } = useActiveTemplate(classId, 'regular')
   const { data: slots, isLoading: slotsLoading } = useTemplateSlots(template?.id)
+  const seedDefaultSlots = useSeedDefaultSlots()
+  const cleanupDuplicates = useCleanupDuplicateSlots()
 
   const selectedClass = classes?.find((c) => c.id === classId)
+
+  // חורים כפולים (אותו weekday+day_part+role) בלתי-נראים כאן (WeekGrid מציג שורה אחת לכל
+  // צירוף), אבל גורמים לחוסר-התאמה מול הדאשבורד — ראו findDuplicateSlotGroups
+  const duplicateGroups = findDuplicateSlotGroups(slots ?? [])
 
   return (
     <div>
@@ -64,8 +76,48 @@ export default function BaseSchedule() {
         <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">
           לכיתה זו אין עדיין תבנית שיבוץ בסיסית פעילה.
         </div>
+      ) : (slots ?? []).length === 0 ? (
+        <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
+          <div className="mb-3">לתבנית של כיתה זו אין חורים כרגע.</div>
+          <button
+            type="button"
+            disabled={seedDefaultSlots.isPending}
+            onClick={() =>
+              seedDefaultSlots.mutate(
+                { templateId: template.id },
+                { onError: (error) => alert(`שחזור החורים נכשל: ${error.message}`) },
+              )
+            }
+            className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            צרי חורי ברירת מחדל (מורה + 2 סייעות)
+          </button>
+        </div>
       ) : (
-        <WeekGrid slots={slots ?? []} employees={employees ?? []} templateId={template.id} />
+        <>
+          {duplicateGroups.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-danger-soft px-3 py-2">
+              <div className="text-[12.5px] text-danger">
+                נמצאו {duplicateGroups.length} חורים כפולים בתבנית זו — הם לא נראים כאן, אבל עלולים
+                לגרום לחוסר-התאמה מול הדאשבורד/שיבוץ מ"מ.
+              </div>
+              <button
+                type="button"
+                disabled={cleanupDuplicates.isPending}
+                onClick={() =>
+                  cleanupDuplicates.mutate(
+                    { templateId: template.id, slots: slots ?? [] },
+                    { onError: (error) => alert(`ניקוי הכפילויות נכשל: ${error.message}`) },
+                  )
+                }
+                className="rounded-md bg-danger px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                נקי כפילויות
+              </button>
+            </div>
+          )}
+          <WeekGrid slots={slots ?? []} employees={employees ?? []} templateId={template.id} />
+        </>
       )}
     </div>
   )
