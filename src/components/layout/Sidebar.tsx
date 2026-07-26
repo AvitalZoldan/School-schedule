@@ -5,8 +5,7 @@ import { useAuth } from '../../lib/AuthContext'
 const NAV_ITEMS = [
   { to: '/', label: 'דאשבורד', end: true },
   { to: '/base', label: 'שיבוץ צוות קבוע בכיתות'},
-  { to: '/daily', label: 'שיבוץ יומי — מ"מ' },
-  { to: '/missing', label: 'דוח חסרים' },
+  { to: '/missing', label: 'שיבוץ מ"מ' },
   { to: '/employee', label: 'דוח לעובדת' },
   { to: '/leave', label: 'ניהול חופשות' },
   { to: '/draft', label: 'טיוטת שיבוץ' },

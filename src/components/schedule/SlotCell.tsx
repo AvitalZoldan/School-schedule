@@ -78,49 +78,48 @@ export function SlotCell({
       </button>
 
       {open && (
-        <div>
-          <div className="mt-1.5 flex flex-col gap-1.5 rounded-md border border-line bg-panel p-2 shadow-sm">
-            <EmployeeCombobox
-              employees={employees}
-              value={slot.assigned_employee_id}
-              onChange={(employeeId) => {
+        <div className="mt-1.5 flex flex-col gap-1.5 rounded-md border border-line bg-panel p-2 shadow-sm">
+          <EmployeeCombobox
+            employees={employees}
+            value={slot.assigned_employee_id}
+            onChange={(employeeId) => {
+              updateSlot.mutate({
+                slotId: slot.id,
+                templateId,
+                assigned_employee_id: employeeId,
+              })
+            }}
+          />
+
+          {!slot.employee && (
+            <select
+              className={`rounded border border-line px-1.5 py-1 text-[12px] ${CRITICALITY_BADGE_CLASS[slot.criticality]}`}
+              value={slot.criticality}
+              onChange={(e) => {
                 updateSlot.mutate({
                   slotId: slot.id,
                   templateId,
-                  assigned_employee_id: employeeId,
+                  assigned_employee_id: slot.assigned_employee_id,
+                  criticality: e.target.value as Criticality,
                 })
               }}
-            />
+            >
+              {(Object.keys(CRITICALITY_LABEL) as Criticality[]).map((c) => (
+                <option key={c} value={c}>
+                  {CRITICALITY_LABEL[c]}
+                </option>
+              ))}
+            </select>
+          )}
 
-            {!slot.employee && (
-              <select
-                className={`rounded border border-line px-1.5 py-1 text-[12px] ${CRITICALITY_BADGE_CLASS[slot.criticality]}`}
-                value={slot.criticality}
-                onChange={(e) => {
-                  updateSlot.mutate({
-                    slotId: slot.id,
-                    templateId,
-                    assigned_employee_id: slot.assigned_employee_id,
-                    criticality: e.target.value as Criticality,
-                  })
-                }}
-              >
-                {(Object.keys(CRITICALITY_LABEL) as Criticality[]).map((c) => (
-                  <option key={c} value={c}>
-                    {CRITICALITY_LABEL[c]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
           <textarea
-              value={notesDraft}
-              onChange={(e) => setNotesDraft(e.target.value)}
-              onBlur={saveNotes}
-              placeholder="הערה (אופציונלי)"
-              rows={2}
-              className="rounded border border-line bg-white px-1.5 py-1 text-[12px]"
-            />
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onBlur={saveNotes}
+            placeholder="הערה (אופציונלי)"
+            rows={2}
+            className="w-full rounded border border-line bg-white px-1.5 py-1 text-[12px]"
+          />
         </div>
       )}
     </td>

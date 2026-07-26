@@ -6,8 +6,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import BaseSchedule from './pages/BaseSchedule'
-import DailyFillIn from './pages/DailyFillIn'
-import MissingReport from './pages/MissingReport'
+import SubstituteAssignment from './pages/SubstituteAssignment'
 import EmployeeReport from './pages/EmployeeReport'
 import Leaves from './pages/Leaves'
 import Draft from './pages/Draft'
@@ -32,8 +31,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="base" element={<BaseSchedule />} />
-        <Route path="daily" element={<DailyFillIn />} />
-        <Route path="missing" element={<MissingReport />} />
+        <Route path="missing" element={<SubstituteAssignment />} />
         <Route path="employee" element={<EmployeeReport />} />
         <Route path="leave" element={<Leaves />} />
         <Route path="draft" element={<Draft />} />
