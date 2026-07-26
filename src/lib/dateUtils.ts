@@ -44,3 +44,10 @@ export function toHebrewDateLabel(d: Date): string {
   return new HDate(d).renderGematriya(true, true)
 }
 
+// תאריך לועזי קצר, למשל "26.07.2026"
+export function toGregorianDateLabel(d: Date): string {
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${day}.${month}.${d.getFullYear()}`
+}
+

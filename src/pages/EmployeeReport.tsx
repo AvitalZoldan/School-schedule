@@ -2,15 +2,21 @@ import { useMemo, useState } from 'react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData, type DashboardClassData } from '../hooks/useDashboard'
-import { addDays, parseISODate, systemWeekday, toHebrewDateLabel, toISODate, weekDates } from '../lib/dateUtils'
+import {
+  addDays,
+  parseISODate,
+  systemWeekday,
+  toGregorianDateLabel,
+  toHebrewDateLabel,
+  toISODate,
+  weekDates,
+} from '../lib/dateUtils'
 import { buildResolveContext, resolveSlotStatus } from '../lib/resolveDashboard'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../types/schedule'
 import type { DayPart, TemplateSlotWithEmployee } from '../types/schedule'
 
 const FRIDAY_WEEKDAY = Object.entries(WEEKDAY_LABELS).find(([, label]) => label === 'שישי')?.[0]
 const FRIDAY_WD = FRIDAY_WEEKDAY !== undefined ? Number(FRIDAY_WEEKDAY) : undefined
-
-type RowKind = 'permanent' | 'sub' | 'leave_sub' | 'absent' | 'leave'
 
 type ReportDayPart = DayPart | 'long'
 
@@ -19,22 +25,11 @@ interface ReportRow {
   weekday: number
   className: string
   dayPart: ReportDayPart
-  kind: RowKind
 }
 
 const DAY_PART_REPORT_LABELS: Record<ReportDayPart, string> = {
   ...DAY_PART_LABELS,
   long: 'ארוך',
-}
-
-// כל שורה מסומנת בפס צבע לפי הסטטוס (עבדה קבועה/מ"מ/נעדרה/בחופשה) — בלי עמודת טקסט נוספת,
-// כדי לשמור על 3 העמודות המבוקשות (תאריך/כיתה/חלק יום) בלבד
-const KIND_ROW_CLASS: Record<RowKind, string> = {
-  permanent: 'border-r-4 border-[#1d4ed8]',
-  sub: 'border-r-4 border-ok',
-  leave_sub: 'border-r-4 border-ok',
-  absent: 'border-r-4 border-danger',
-  leave: 'border-r-4 border-ink-soft',
 }
 
 function dateRange(start: string, end: string): string[] {
@@ -82,12 +77,10 @@ export default function EmployeeReport() {
   const rows = useMemo(() => {
     if (!data || !ctx || !employeeId || !startDate || !endDate) return []
 
-    // מקובצות לפי תאריך+כיתה+סטטוס — אם אותה כיתה מופיעה גם בבוקר וגם בצהריים באותו
-    // סטטוס, מוצגות כשורה אחת עם חלק יום "ארוך" במקום שתי שורות זהות
-    const groups = new Map<
-      string,
-      { date: string; weekday: number; className: string; kind: RowKind; parts: Set<DayPart> }
-    >()
+    // רק ימים שהעובדת עבדה בפועל (קבועה/מ"מ/מ"מ-חופשה) — לא נעדרויות/חופשות.
+    // מקובצות לפי תאריך+כיתה: אם אותה כיתה מופיעה גם בבוקר וגם בצהריים, מוצגת כשורה
+    // אחת עם חלק יום "ארוך" במקום שתי שורות זהות
+    const groups = new Map<string, { date: string; weekday: number; className: string; parts: Set<DayPart> }>()
 
     for (const date of dateRange(startDate, endDate)) {
       const wd = systemWeekday(parseISODate(date))
@@ -95,24 +88,16 @@ export default function EmployeeReport() {
         if (slot.day_part === 'afternoon' && wd === FRIDAY_WD) continue
         const status = resolveSlotStatus(slot, date, ctx)
 
-        let kind: RowKind | null = null
-        if (status.kind === 'filled_permanent' && status.employeeId === employeeId) kind = 'permanent'
-        else if (status.kind === 'filled_sub' && status.employeeId === employeeId) kind = 'sub'
-        else if (status.kind === 'filled_leave_sub' && status.employeeId === employeeId) kind = 'leave_sub'
-        else if (status.kind === 'missing' && slot.assigned_employee_id === employeeId) {
-          kind = ctx.absenceSet.has(`${employeeId}:${date}`) ? 'absent' : 'leave'
-        }
-        if (!kind) continue
+        const worked =
+          (status.kind === 'filled_permanent' ||
+            status.kind === 'filled_sub' ||
+            status.kind === 'filled_leave_sub') &&
+          status.employeeId === employeeId
+        if (!worked) continue
 
-        const key = `${date}:${classData.classRow.id}:${kind}`
+        const key = `${date}:${classData.classRow.id}`
         if (!groups.has(key)) {
-          groups.set(key, {
-            date,
-            weekday: wd,
-            className: classData.classRow.name,
-            kind,
-            parts: new Set(),
-          })
+          groups.set(key, { date, weekday: wd, className: classData.classRow.name, parts: new Set() })
         }
         groups.get(key)!.parts.add(slot.day_part)
       }
@@ -122,7 +107,6 @@ export default function EmployeeReport() {
       date: g.date,
       weekday: g.weekday,
       className: g.className,
-      kind: g.kind,
       dayPart: g.parts.has('morning') && g.parts.has('afternoon') ? 'long' : g.parts.has('morning') ? 'morning' : 'afternoon',
     }))
 
@@ -194,7 +178,7 @@ export default function EmployeeReport() {
         <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
       ) : rows.length === 0 ? (
         <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
-          אין נתונים בטווח שנבחר
+העובדת לא עבדה בטווח שנבחר
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-line bg-panel">
@@ -208,12 +192,10 @@ export default function EmployeeReport() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr
-                  key={`${row.date}:${row.className}:${row.kind}`}
-                  className={`border-b border-line last:border-0 ${KIND_ROW_CLASS[row.kind]}`}
-                >
+                <tr key={`${row.date}:${row.className}`} className="border-b border-line last:border-0">
                   <td className="px-3 py-2">
-                    {WEEKDAY_LABELS[row.weekday]} · {toHebrewDateLabel(parseISODate(row.date))}
+                    {WEEKDAY_LABELS[row.weekday]} · {toHebrewDateLabel(parseISODate(row.date))} ·{' '}
+                    {toGregorianDateLabel(parseISODate(row.date))}
                   </td>
                   {showClass && <td className="px-3 py-2">כיתה {row.className}</td>}
                   <td className="px-3 py-2">{DAY_PART_REPORT_LABELS[row.dayPart]}</td>
