@@ -14,7 +14,7 @@ import { parseISODate, systemWeekday } from './dateUtils'
 export interface ResolveContext {
   absenceSet: Set<string> // `${employeeId}:${date}`
   leavesByEmployee: Map<number, EmployeeLeaveRow[]>
-  leaveSubByEmployeeDate: Map<string, LeaveDayAssignmentRow> // key: `${leaveEmployeeId}:${date}`
+  leaveSubBySlotDate: Map<string, LeaveDayAssignmentRow> // key: `${slotId}:${date}`
   dailyAssignBySlotDate: Map<string, DailyAssignmentRow> // key: `${slotId}:${date}`
 }
 
@@ -26,12 +26,12 @@ export function buildResolveContext(
   const absenceSet = new Set(absences.map((a) => `${a.employee_id}:${a.absence_date}`))
 
   const leavesByEmployee = new Map<number, EmployeeLeaveRow[]>()
-  const leaveSubByEmployeeDate = new Map<string, LeaveDayAssignmentRow>()
+  const leaveSubBySlotDate = new Map<string, LeaveDayAssignmentRow>()
   for (const leave of leaves) {
     if (!leavesByEmployee.has(leave.employee_id)) leavesByEmployee.set(leave.employee_id, [])
     leavesByEmployee.get(leave.employee_id)!.push(leave)
     for (const dayAssign of leave.leave_day_assignments ?? []) {
-      leaveSubByEmployeeDate.set(`${leave.employee_id}:${dayAssign.assignment_date}`, dayAssign)
+      leaveSubBySlotDate.set(`${dayAssign.slot_id}:${dayAssign.assignment_date}`, dayAssign)
     }
   }
 
@@ -40,7 +40,7 @@ export function buildResolveContext(
     dailyAssignBySlotDate.set(`${da.slot_id}:${da.assignment_date}`, da)
   }
 
-  return { absenceSet, leavesByEmployee, leaveSubByEmployeeDate, dailyAssignBySlotDate }
+  return { absenceSet, leavesByEmployee, leaveSubBySlotDate, dailyAssignBySlotDate }
 }
 
 function isOnLeave(ctx: ResolveContext, employeeId: number, date: string): boolean {
@@ -68,7 +68,7 @@ export function resolveSlotStatus(
     }
 
     if (onLeave) {
-      const leaveSub = ctx.leaveSubByEmployeeDate.get(`${baseEmployeeId}:${date}`)
+      const leaveSub = ctx.leaveSubBySlotDate.get(`${slot.id}:${date}`)
       if (leaveSub) {
         return { kind: 'filled_leave_sub', employeeId: leaveSub.employee_id }
       }

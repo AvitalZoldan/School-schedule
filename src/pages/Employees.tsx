@@ -8,9 +8,12 @@ import {
   type EmployeeWithType,
   type EmployeeFormInput,
 } from '../hooks/useEmployees'
+import { useLeaves, useCancelLeave, type LeaveWithEmployee } from '../hooks/useLeaves'
+import { toISODate } from '../lib/dateUtils'
 import { EMPLOYEE_STATUS_LABELS, type EmployeeStatus } from '../types/schedule'
 import { useAuth } from '../lib/AuthContext'
 import { useConfirm } from '../components/common/ConfirmProvider'
+import { LeaveFormModal } from '../components/employees/LeaveFormModal'
 
 type ModalMode = { kind: 'create' } | { kind: 'edit'; employee: EmployeeWithType }
 
@@ -31,14 +34,29 @@ export default function Employees() {
 
   const { data: employees, isLoading } = useEmployeesOverview(schoolId)
   const { data: employeeTypes } = useEmployeeTypes(schoolId)
+  const { data: leaves } = useLeaves(schoolId)
   const createEmployee = useCreateEmployee()
   const updateEmployee = useUpdateEmployee()
+  const cancelLeave = useCancelLeave()
   const confirm = useConfirm()
 
   const [showInactive, setShowInactive] = useState(false)
   const [modal, setModal] = useState<ModalMode | null>(null)
   const [form, setForm] = useState<EmployeeFormInput>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
+  const [leaveModalEmployee, setLeaveModalEmployee] = useState<EmployeeWithType | null>(null)
+
+  // עבור כל עובדת קבועה, החופשה הפעילה/עתידית האחרונה שלה (אם יש) — לכפתור "ניהול/הוספת חופשה" (3.7)
+  const currentLeaveByEmployeeId = useMemo(() => {
+    const today = toISODate(new Date())
+    const map = new Map<number, LeaveWithEmployee>()
+    for (const leave of leaves ?? []) {
+      if (leave.status !== 'active' || leave.end_date < today) continue
+      const existing = map.get(leave.employee_id)
+      if (!existing || leave.start_date < existing.start_date) map.set(leave.employee_id, leave)
+    }
+    return map
+  }, [leaves])
 
   const visibleEmployees = useMemo(
     () => (employees ?? []).filter((e) => e.active || showInactive),
@@ -103,6 +121,16 @@ export default function Employees() {
     } catch {
       setFormError('השמירה נכשלה. נסי שוב.')
     }
+  }
+
+  async function handleCancelLeave(leave: LeaveWithEmployee) {
+    if (!schoolId) return
+    const hasSubDays = (leave.leave_day_assignments ?? []).length > 0
+    const message = hasSubDays
+      ? 'האם את בטוחה שברצונך לבטל את החופשה? מ"מ שכבר שובצו כמחליפות יימחקו.'
+      : 'האם את בטוחה שברצונך לבטל את החופשה?'
+    if (!(await confirm(message))) return
+    cancelLeave.mutate({ schoolId, leaveId: leave.id })
   }
 
   async function toggleActive(employee: EmployeeWithType) {
@@ -192,7 +220,7 @@ export default function Employees() {
                   </td>
                   <td className="border-t border-line px-3 py-2">
                     {canEdit && (
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex flex-wrap justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => openEditModal(emp)}
@@ -200,6 +228,24 @@ export default function Employees() {
                         >
                           עריכה
                         </button>
+                        {emp.status === 'permanent' && emp.active && (
+                          <button
+                            type="button"
+                            onClick={() => setLeaveModalEmployee(emp)}
+                            className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                          >
+                            {currentLeaveByEmployeeId.has(emp.id) ? 'ניהול חופשה' : 'הוספת חופשה'}
+                          </button>
+                        )}
+                        {currentLeaveByEmployeeId.has(emp.id) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelLeave(currentLeaveByEmployeeId.get(emp.id)!)}
+                            className="rounded-md border border-line px-2.5 py-1 text-[12px] text-danger hover:bg-[#f2f0ea]"
+                          >
+                            ביטול חופשה
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => toggleActive(emp)}
@@ -346,6 +392,16 @@ export default function Employees() {
             </form>
           </div>
         </div>
+      )}
+
+      {leaveModalEmployee && schoolId && (
+        <LeaveFormModal
+          schoolId={schoolId}
+          employee={leaveModalEmployee}
+          existingLeave={currentLeaveByEmployeeId.get(leaveModalEmployee.id)}
+          createdBy={profile?.id ?? null}
+          onClose={() => setLeaveModalEmployee(null)}
+        />
       )}
     </div>
   )

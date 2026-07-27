@@ -38,6 +38,17 @@ export function weekDates(d: Date): string[] {
   return Array.from({ length: 6 }, (_, i) => toISODate(addDays(start, i)))
 }
 
+// כל התאריכים (ISO) בטווח [start, end] כולל שני הקצוות — לשימוש בטווחי חופשה (3.7) וכדומה
+export function datesInRange(start: string, end: string): string[] {
+  const result: string[] = []
+  let cursor = parseISODate(start)
+  while (toISODate(cursor) <= end) {
+    result.push(toISODate(cursor))
+    cursor = addDays(cursor, 1)
+  }
+  return result
+}
+
 // תאריך עברי מלא (יום+חודש) בגימטריה עם גרשיים, למשל "י״ח אב" / "ב׳ אדר ב" — ממיר Date לועזי
 // דרך @hebcal/hdate (ספריית חישוב לוח עברי מדויקת, כולל חודש מעובר), בלי ניקוד ובלי שנה.
 export function toHebrewDateLabel(d: Date): string {

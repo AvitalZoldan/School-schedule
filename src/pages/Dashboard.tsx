@@ -10,6 +10,7 @@ import { addDays, parseISODate, toHebrewDateLabel, toISODate, weekDates } from '
 import { buildResolveContext, computeOccupancyMap } from '../lib/resolveDashboard'
 import { WEEKDAY_LABELS } from '../types/schedule'
 import { ClassGrid } from '../components/dashboard/ClassGrid'
+import { LeaveReminderBanner } from '../components/dashboard/LeaveReminderBanner'
 import { SegmentedToggle } from '../components/common/SegmentedToggle'
 
 type RangeMode = 'day' | 'week'
@@ -155,6 +156,8 @@ export default function Dashboard() {
           </select>
         </div>
       </div>
+
+      {schoolId && <div className="mb-4"><LeaveReminderBanner schoolId={schoolId} /></div>}
 
       {isLoading || !data || !ctx ? (
         <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>

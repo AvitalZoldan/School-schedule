@@ -29,6 +29,7 @@ export interface LeaveDayAssignmentRow {
   school_id: number
   leave_id: number
   assignment_date: string
+  slot_id: number // המשבצת הספציפית (כיתה+חלק יום) — מאפשר מ"מ שונה לבוקר/צהריים באותו יום
   employee_id: number
 }
 
@@ -39,7 +40,7 @@ export interface EmployeeLeaveRow {
   start_date: string
   end_date: string
   reminder_days_before: number
-  reminder_email: string
+  reminder_dismissed: boolean
   notes: string | null
   status: 'active' | 'cancelled'
   leave_day_assignments?: LeaveDayAssignmentRow[]
