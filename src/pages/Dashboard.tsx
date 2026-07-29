@@ -44,6 +44,11 @@ export default function Dashboard() {
   const startDate = dates[0]
   const endDate = dates[dates.length - 1]
 
+  const dateRangeLabel =
+    rangeMode === 'day'
+      ? toHebrewDateLabel(parseISODate(startDate))
+      : `${toHebrewDateLabel(parseISODate(startDate))} – ${toHebrewDateLabel(parseISODate(endDate))}`
+
   // הנתונים נשלפים תמיד עבור כל הכיתות (ראו useDashboardData) — סינון ה"היקף" הנבחר
   // (כל הכיתות/כיתה ספציפית) מוחל רק על מה שמוצג, כדי שבדיקת התפוסה/כפילות תישאר נכונה
   // גם כשבוחרים כיתה בודדת (עובדת שמשובצת בכיתה אחרת עדיין תזוהה כתפוסה).
@@ -99,7 +104,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <h1 className="text-xl font-bold">לוח בקרה</h1>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -136,11 +141,7 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="text-[12.5px] text-ink-soft">
-            {rangeMode === 'day'
-              ? toHebrewDateLabel(parseISODate(startDate))
-              : `${toHebrewDateLabel(parseISODate(startDate))} – ${toHebrewDateLabel(parseISODate(endDate))}`}
-          </div>
+          <div className="text-[12.5px] text-ink-soft">{dateRangeLabel}</div>
 
           <select
             className="rounded-lg border border-line bg-white px-3 py-2 text-[13px]"
@@ -157,50 +158,70 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {schoolId && <div className="mb-4"><LeaveReminderBanner schoolId={schoolId} /></div>}
-
-      {isLoading || !data || !ctx ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
-      ) : (
-        <div className="flex flex-col gap-5">
-          {missingOpening.length > 0 && (
-            <div className="rounded-xl border border-line bg-panel p-3">
-              <div className="mb-2 text-[13px] font-bold">תפקידי פתיחה לא-מאוישים</div>
-              <ul className="flex flex-col gap-1 text-[12.5px]">
-                {missingOpening.map((m, i) => (
-                  <li key={i} className="text-warn">
-                    {WEEKDAY_LABELS[m.weekday]} — {m.roleName}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 text-[11.5px] text-ink-soft">
-                לעריכה יש לפתוח את מסך "מערכת פתיחות".
-              </div>
-            </div>
-          )}
-
-          <div
-            className="grid gap-4"
-            style={{
-              gridTemplateColumns: `repeat(auto-fit, minmax(${rangeMode === 'week' ? 420 : 230}px, 1fr))`,
-            }}
-          >
-            {visibleClasses.map((classData) => (
-              <ClassGrid
-                key={classData.classRow.id}
-                classData={classData}
-                dates={dates}
-                ctx={ctx}
-                employeesById={employeesById}
-                allEmployees={allEmployees ?? []}
-                occupancyMap={occupancyMap}
-                schoolId={schoolId!}
-                createdBy={profile?.id ?? null}
-              />
-            ))}
-          </div>
+      {schoolId && (
+        <div className="mb-4 print:hidden">
+          <LeaveReminderBanner schoolId={schoolId} />
         </div>
       )}
+
+      {/* table+thead: הדפדפן חוזר אוטומטית על thead בראש כל עמוד מודפס שאליו נשברת tbody —
+          זו הדרך היחידה שעובדת בכל דפדפן בלי תלות בהגדרת "כותרות ותחתיות" בחלון ההדפסה */}
+      <table className="w-full border-collapse">
+        <thead className="hidden print:table-header-group">
+          <tr>
+            <th className="pb-3 text-center text-[13px] font-medium">{dateRangeLabel}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="p-0">
+              {isLoading || !data || !ctx ? (
+                <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
+              ) : (
+                <div className="flex flex-col gap-5">
+                  {missingOpening.length > 0 && (
+                    <div className="rounded-xl border border-line bg-panel p-3 print:hidden">
+                      <div className="mb-2 text-[13px] font-bold">תפקידי פתיחה לא-מאוישים</div>
+                      <ul className="flex flex-col gap-1 text-[12.5px]">
+                        {missingOpening.map((m, i) => (
+                          <li key={i} className="text-warn">
+                            {WEEKDAY_LABELS[m.weekday]} — {m.roleName}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-[11.5px] text-ink-soft">
+                        לעריכה יש לפתוח את מסך "מערכת פתיחות".
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className="grid gap-4"
+                    style={{
+                      gridTemplateColumns: `repeat(auto-fit, minmax(${rangeMode === 'week' ? 420 : 230}px, 1fr))`,
+                    }}
+                  >
+                    {visibleClasses.map((classData) => (
+                      <div key={classData.classRow.id} className="break-inside-avoid">
+                        <ClassGrid
+                          classData={classData}
+                          dates={dates}
+                          ctx={ctx}
+                          employeesById={employeesById}
+                          allEmployees={allEmployees ?? []}
+                          occupancyMap={occupancyMap}
+                          schoolId={schoolId!}
+                          createdBy={profile?.id ?? null}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -155,7 +155,7 @@ export default function CampDetail() {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to="/camps" className="text-[12.5px] text-ink-soft hover:underline">
+          <Link to="/camps" className="text-[12.5px] text-ink-soft hover:underline print:hidden">
             ← ניהול קייטנות
           </Link>
           <h1 className="mt-1 text-xl font-bold">{camp.name}</h1>
@@ -164,7 +164,7 @@ export default function CampDetail() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -206,29 +206,49 @@ export default function CampDetail() {
         </div>
       </div>
 
-      {dashboardLoading || !dashboardData || !ctx ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
-      ) : (
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))' }}>
-          {visibleClasses.map((classData) => (
-            <ClassGrid
-              key={classData.classRow.id}
-              classData={classData}
-              dates={visibleDates}
-              ctx={ctx}
-              employeesById={employeesById}
-              allEmployees={allEmployees ?? []}
-              occupancyMap={occupancyMap}
-              schoolId={schoolId!}
-              createdBy={profile?.id ?? null}
-              isCellDisabled={isCellDisabled}
-            />
-          ))}
-        </div>
-      )}
+      {/* table+thead: הדפדפן חוזר אוטומטית על thead בראש כל עמוד מודפס שאליו נשברת tbody —
+          כך הקשר "שבוע X" (שמוסתר בהדפסה בתוך הכותרת העליונה) לא הולך לאיבוד ברשת רב-עמודית */}
+      <table className="w-full border-collapse">
+        <thead className="hidden print:table-header-group">
+          <tr>
+            <th className="pb-3 text-center text-[13px] font-medium">
+              {visibleDates.length > 0
+                ? `שבוע ${weekNumber} (${toGregorianDateLabel(parseISODate(visibleDates[0]))} – ${toGregorianDateLabel(parseISODate(visibleDates[visibleDates.length - 1]))})`
+                : ''}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="p-0">
+              {dashboardLoading || !dashboardData || !ctx ? (
+                <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
+              ) : (
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))' }}>
+                  {visibleClasses.map((classData) => (
+                    <div key={classData.classRow.id} className="break-inside-avoid">
+                      <ClassGrid
+                        classData={classData}
+                        dates={visibleDates}
+                        ctx={ctx}
+                        employeesById={employeesById}
+                        allEmployees={allEmployees ?? []}
+                        occupancyMap={occupancyMap}
+                        schoolId={schoolId!}
+                        createdBy={profile?.id ?? null}
+                        isCellDisabled={isCellDisabled}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       <details
-        className="mt-6 rounded-xl border border-line bg-panel px-3 py-2.5"
+        className="mt-6 rounded-xl border border-line bg-panel px-3 py-2.5 print:hidden"
         onToggle={(e) => setOpeningExpanded(e.currentTarget.open)}
       >
         <summary className="cursor-pointer select-none text-[12.5px] font-medium text-ink-soft">

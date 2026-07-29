@@ -74,6 +74,7 @@ export default function Draft() {
   }
 
   const isBusy = createDraft.isPending || discardDraft.isPending || applyDraft.isPending
+  const selectedClass = classes?.find((c) => c.id === classId)
 
   return (
     <div>
@@ -81,7 +82,7 @@ export default function Draft() {
         <h1 className="text-xl font-bold">טיוטת שיבוץ</h1>
 
         <select
-          className="rounded-lg border border-line bg-white px-3 py-2 text-[13px]"
+          className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] print:hidden"
           value={classId ?? ''}
           onChange={(e) => {
             setClassId(Number(e.target.value))
@@ -97,8 +98,11 @@ export default function Draft() {
         </select>
       </div>
 
+      {/* בהדפסה מוסתר בורר הכיתה שבתפריט למעלה — כותרת זו שומרת על ההקשר "איזו כיתה" בעמוד המודפס */}
+      {selectedClass && <div className="mb-3 hidden text-[13px] font-bold print:block">כיתה {selectedClass.name}</div>}
+
       {applySuccessMessage && (
-        <div className="mb-4 flex items-center justify-between gap-2 rounded-lg border border-line bg-ok-soft px-3 py-2 text-[12.5px] text-ok">
+        <div className="mb-4 flex items-center justify-between gap-2 rounded-lg border border-line bg-ok-soft px-3 py-2 text-[12.5px] text-ok print:hidden">
           <span>{applySuccessMessage}</span>
           <button
             type="button"
@@ -139,7 +143,7 @@ export default function Draft() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-warn-soft px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-warn-soft px-3 py-2 print:hidden">
             <div className="text-[12.5px] text-warn">
               עורכת טיוטה — השינויים כאן לא משפיעים על השיבוץ הפעיל עד ל"החלת טיוטה".
             </div>

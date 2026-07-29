@@ -65,7 +65,7 @@ export default function Opening() {
           <button
             type="button"
             onClick={openModal}
-            className="shrink-0 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="shrink-0 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
           >
             + הוספת תפקיד
           </button>

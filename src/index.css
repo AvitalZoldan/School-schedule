@@ -5,3 +5,29 @@
 body {
   @apply bg-paper text-ink font-sans;
 }
+
+/* הדפסה / "הורדת PDF": מציגות רק את תוכן המסך הנוכחי (#print-area), בלי סיידבר וכפתורים */
+@media print {
+  /* בלי size מפורש: כשה-CSS קובע גודל עמוד, כרום מסתיר את בורר ה"פריסה" (לאורך/לרוחב)
+     בחלון ההדפסה. משאירים רק שוליים כדי לתת לדפדפן לשלוט על גודל וכיוון העמוד. */
+  @page {
+    margin: 14mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #print-area,
+  #print-area * {
+    visibility: visible;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+}

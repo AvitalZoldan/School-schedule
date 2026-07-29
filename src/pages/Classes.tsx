@@ -113,7 +113,7 @@ export default function Classes() {
           <button
             type="button"
             onClick={openCreateModal}
-            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
           >
             + הוספת כיתה
           </button>
@@ -126,7 +126,7 @@ export default function Classes() {
           אינו משפיע על שנים קודמות בהיסטוריה.
         </span>
         {inactiveCount > 0 && (
-          <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px]">
+          <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] print:hidden">
             <input
               type="checkbox"
               checked={showInactive}
@@ -181,7 +181,7 @@ export default function Classes() {
                     </span>
                   </td>
                   <td className="border-t border-line px-3 py-2">
-                    <div className="flex justify-end gap-1.5">
+                    <div className="flex justify-end gap-1.5 print:hidden">
                       {c.active && (
                         <button
                           type="button"

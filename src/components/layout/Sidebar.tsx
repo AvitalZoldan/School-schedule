@@ -1,24 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../lib/AuthContext'
-
-// כל פריט תפריט תואם למסך אחד מהאפיון (סעיף 5) ומהמוקאפ (data-screen)
-const NAV_ITEMS = [
-  { to: '/', label: 'דאשבורד', end: true },
-  { to: '/base', label: 'שיבוץ צוות קבוע בכיתות'},
-  { to: '/missing', label: 'שיבוץ מ"מ' },
-  { to: '/employee', label: 'דוח לעובדת' },
-  { to: '/camps', label: 'ניהול קייטנות' },
-  { to: '/draft', label: 'טיוטת שיבוץ' },
-  { to: '/opening', label: 'מערכת פתיחות' },
-  { to: '/history', label: 'היסטוריה' },
-] as const
-
-// קבוצת "ניהול" — הגדרות מערכת + מסכי בסיס (כיתות/עובדות) שמשמשים להקמה/תחזוקה, לא לעבודה היומיומית
-const MANAGEMENT_ITEMS = [
-  { to: '/management', label: 'הגדרות' },
-  { to: '/staff', label: 'רשימת עובדות' },
-  { to: '/classes', label: 'כיתות' },
-] as const
+import { NAV_ITEMS, MANAGEMENT_ITEMS } from '../../lib/pageTitles'
 
 export function Sidebar() {
   const { profile, signOut } = useAuth()

@@ -32,7 +32,7 @@ export default function SystemAdmin() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-1 border-b border-line">
+      <div className="mb-4 flex gap-1 border-b border-line print:hidden">
         <button
           type="button"
           onClick={() => setTab('schools')}
@@ -103,7 +103,7 @@ function SchoolsPanel() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-end print:hidden">
         <button
           type="button"
           onClick={openModal}
@@ -143,7 +143,7 @@ function SchoolsPanel() {
                     )}
                   </td>
                   <td className="border-t border-line px-3 py-2">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end print:hidden">
                       <button
                         type="button"
                         onClick={() => toggleActive(school)}
@@ -276,7 +276,7 @@ function UsersPanel() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-end print:hidden">
         <button
           type="button"
           onClick={openInviteModal}
@@ -327,7 +327,7 @@ function UsersPanel() {
                     )}
                   </td>
                   <td className="border-t border-line px-3 py-2">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end print:hidden">
                       <button
                         type="button"
                         onClick={() => setDetailsUser(user)}

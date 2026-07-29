@@ -124,12 +124,18 @@ export default function EmployeeReport() {
     [allEmployees],
   )
 
+  const selectedEmployeeName = sortedEmployees.find((e) => e.id === employeeId)?.full_name ?? ''
+  const reportRangeLabel =
+    startDate && endDate
+      ? `${toHebrewDateLabel(parseISODate(startDate))} – ${toHebrewDateLabel(parseISODate(endDate))}`
+      : ''
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold">דוח לעובדת</h1>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <select
             className="rounded-lg border border-line bg-white px-3 py-2 text-[13px]"
             value={employeeId ?? ''}
@@ -170,41 +176,60 @@ export default function EmployeeReport() {
         </div>
       </div>
 
-      {!employeeId ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
-          בחרי עובדת כדי להציג את טבלת השיבוצים שלה
-        </div>
-      ) : isLoading || !data || !ctx ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
-      ) : rows.length === 0 ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
+      {/* table+thead: הדפדפן חוזר אוטומטית על thead בראש כל עמוד מודפס שאליו נשברת tbody —
+          כך שם העובדת+הטווח (מוסתרים בהדפסה בתוך הכותרת העליונה) לא הולכים לאיבוד בדוח ארוך */}
+      <table className="w-full border-collapse">
+        <thead className="hidden print:table-header-group">
+          <tr>
+            <th className="pb-3 text-center text-[13px] font-medium">
+              {selectedEmployeeName}
+              {selectedEmployeeName && reportRangeLabel ? ' · ' : ''}
+              {reportRangeLabel}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="p-0">
+              {!employeeId ? (
+                <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
+                  בחרי עובדת כדי להציג את טבלת השיבוצים שלה
+                </div>
+              ) : isLoading || !data || !ctx ? (
+                <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
+              ) : rows.length === 0 ? (
+                <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
 העובדת לא עבדה בטווח שנבחר
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-panel">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr className="bg-[#f7f6f2] text-right text-[11.5px] text-ink-soft">
-                <th className="border-b border-line px-3 py-2 font-medium">תאריך</th>
-                {showClass && <th className="border-b border-line px-3 py-2 font-medium">כיתה</th>}
-                <th className="border-b border-line px-3 py-2 font-medium">חלק יום</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={`${row.date}:${row.className}`} className="border-b border-line last:border-0">
-                  <td className="px-3 py-2">
-                    {WEEKDAY_LABELS[row.weekday]} · {toHebrewDateLabel(parseISODate(row.date))} ·{' '}
-                    {toGregorianDateLabel(parseISODate(row.date))}
-                  </td>
-                  {showClass && <td className="px-3 py-2">כיתה {row.className}</td>}
-                  <td className="px-3 py-2">{DAY_PART_REPORT_LABELS[row.dayPart]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-line bg-panel">
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#f7f6f2] text-right text-[11.5px] text-ink-soft">
+                        <th className="border-b border-line px-3 py-2 font-medium">תאריך</th>
+                        {showClass && <th className="border-b border-line px-3 py-2 font-medium">כיתה</th>}
+                        <th className="border-b border-line px-3 py-2 font-medium">חלק יום</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={`${row.date}:${row.className}`} className="border-b border-line last:border-0">
+                          <td className="px-3 py-2">
+                            {WEEKDAY_LABELS[row.weekday]} · {toHebrewDateLabel(parseISODate(row.date))} ·{' '}
+                            {toGregorianDateLabel(parseISODate(row.date))}
+                          </td>
+                          {showClass && <td className="px-3 py-2">כיתה {row.className}</td>}
+                          <td className="px-3 py-2">{DAY_PART_REPORT_LABELS[row.dayPart]}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }

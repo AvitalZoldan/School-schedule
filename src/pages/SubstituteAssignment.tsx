@@ -131,7 +131,7 @@ export default function SubstituteAssignment() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold">שיבוץ מ"מ</h1>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <SegmentedToggle
             value={rangeMode}
             onChange={setRangeMode}
@@ -187,7 +187,7 @@ export default function SubstituteAssignment() {
       ) : (
         <div className="flex flex-col gap-5">
           {missingOpening.length > 0 && (
-            <div className="rounded-xl border border-line bg-panel p-3">
+            <div className="rounded-xl border border-line bg-panel p-3 print:hidden">
               <div className="mb-2 text-[13px] font-bold">תפקידי פתיחה לא-מאוישים</div>
               <ul className="flex flex-col gap-1 text-[12.5px]">
                 {missingOpening.map((m, i) => (
@@ -252,7 +252,7 @@ export default function SubstituteAssignment() {
                         {dateHeader}
                         <div className="grid gap-3 md:grid-cols-2">
                           {(['morning', 'afternoon'] as const).map((part) => (
-                            <div key={part} className="rounded-lg border border-line bg-[#f7f6f2] p-2">
+                            <div key={part} className="break-inside-avoid rounded-lg border border-line bg-[#f7f6f2] p-2">
                               <div
                                 className={`mb-2 w-fit rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                                   part === 'morning' ? 'bg-warn-soft text-warn' : 'bg-accent-soft text-accent'
@@ -306,7 +306,7 @@ export default function SubstituteAssignment() {
                           return (
                             <div
                               key={group.className}
-                              className="rounded-lg border border-line border-t-[3px] border-t-accent bg-[#f7f6f2] p-2"
+                              className="break-inside-avoid rounded-lg border border-line border-t-[3px] border-t-accent bg-[#f7f6f2] p-2"
                             >
                               <div className="mb-1.5 border-b border-line pb-1 text-[12.5px] font-semibold">
                                 כיתה {group.className}

@@ -58,7 +58,7 @@ export default function Camps() {
           <button
             type="button"
             onClick={() => setModal({ kind: 'create' })}
-            className="shrink-0 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="shrink-0 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
           >
             + קייטנה חדשה
           </button>
@@ -104,7 +104,7 @@ export default function Camps() {
                       </span>
                     </td>
                     <td className="border-t border-line px-3 py-2">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex justify-end gap-1.5 print:hidden">
                         {canEdit && (
                           <button
                             type="button"

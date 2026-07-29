@@ -32,15 +32,17 @@ export default function Management() {
           {isLoading || !settings ? (
             <div className="text-[12.5px] text-ink-soft">טוען…</div>
           ) : (
-            <SegmentedToggle
-              value={settings.dashboard_default_range}
-              onChange={setDashboardDefaultRange}
-              disabled={!canEdit}
-              options={[
-                { value: 'day', label: 'יום' },
-                { value: 'week', label: 'שבוע' },
-              ]}
-            />
+            <div className="print:hidden">
+              <SegmentedToggle
+                value={settings.dashboard_default_range}
+                onChange={setDashboardDefaultRange}
+                disabled={!canEdit}
+                options={[
+                  { value: 'day', label: 'יום' },
+                  { value: 'week', label: 'שבוע' },
+                ]}
+              />
+            </div>
           )}
 
           {!canEdit && (

@@ -158,7 +158,7 @@ export default function Employees() {
           <button
             type="button"
             onClick={openCreateModal}
-            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
           >
             + עובדת חדשה
           </button>
@@ -166,7 +166,7 @@ export default function Employees() {
       </div>
 
       {inactiveCount > 0 && (
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex justify-end print:hidden">
           <label className="flex items-center gap-1.5 text-[12px] text-ink-soft">
             <input
               type="checkbox"
@@ -220,7 +220,7 @@ export default function Employees() {
                   </td>
                   <td className="border-t border-line px-3 py-2">
                     {canEdit && (
-                      <div className="flex flex-wrap justify-end gap-1.5">
+                      <div className="flex flex-wrap justify-end gap-1.5 print:hidden">
                         <button
                           type="button"
                           onClick={() => openEditModal(emp)}

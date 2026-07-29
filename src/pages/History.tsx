@@ -69,6 +69,7 @@ export default function History() {
   const employeeName = (id: number | null | undefined) =>
     id ? (employeesById.get(id) ?? `עובדת #${id}`) : '—'
   const className = (id: number | null | undefined) => (id ? (classesById.get(id) ?? `כיתה #${id}`) : '—')
+  const dateLabel = toGregorianDateLabel(parseISODate(date))
 
   return (
     <div>
@@ -81,7 +82,7 @@ export default function History() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 print:hidden">
           <button
             type="button"
             onClick={() => setDate((d) => toISODate(addDays(parseISODate(d), -1)))}
@@ -112,30 +113,45 @@ export default function History() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-line bg-panel">
-        {isLoading ? (
-          <div className="p-[18px] text-center text-ink-soft">טוען…</div>
-        ) : entries && entries.length > 0 ? (
-          <div className="flex flex-col">
-            {entries.map((entry) => (
-              <div key={entry.id} className="flex items-start gap-3 border-t border-line px-3 py-2.5 text-[13px] first:border-t-0">
-                <div className="w-12 shrink-0 text-[12px] text-ink-soft" dir="ltr">
-                  {toLocalTimeLabel(entry.changed_at)}
-                </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${ACTION_CLASSES[entry.action]}`}>
-                  {ACTION_LABELS[entry.action]}
-                </span>
-                <div className="min-w-0 flex-1">{describeEntry(entry, employeeName, className)}</div>
-                <div className="shrink-0 text-[12px] text-ink-soft">
-                  {entry.changed_by_profile?.full_name ?? 'לא ידוע'}
-                </div>
+      {/* table+thead: הדפדפן חוזר אוטומטית על thead בראש כל עמוד מודפס שאליו נשברת tbody —
+          כך התאריך הנבחר (שמוסתר בהדפסה בתוך הכותרת) לא הולך לאיבוד ברשימה ארוכה */}
+      <table className="w-full border-collapse">
+        <thead className="hidden print:table-header-group">
+          <tr>
+            <th className="pb-3 text-center text-[13px] font-medium">{dateLabel}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="p-0">
+              <div className="rounded-xl border border-line bg-panel">
+                {isLoading ? (
+                  <div className="p-[18px] text-center text-ink-soft">טוען…</div>
+                ) : entries && entries.length > 0 ? (
+                  <div className="flex flex-col">
+                    {entries.map((entry) => (
+                      <div key={entry.id} className="flex items-start gap-3 border-t border-line px-3 py-2.5 text-[13px] first:border-t-0">
+                        <div className="w-12 shrink-0 text-[12px] text-ink-soft" dir="ltr">
+                          {toLocalTimeLabel(entry.changed_at)}
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${ACTION_CLASSES[entry.action]}`}>
+                          {ACTION_LABELS[entry.action]}
+                        </span>
+                        <div className="min-w-0 flex-1">{describeEntry(entry, employeeName, className)}</div>
+                        <div className="shrink-0 text-[12px] text-ink-soft">
+                          {entry.changed_by_profile?.full_name ?? 'לא ידוע'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-[18px] text-center text-ink-soft">אין שינויים רשומים בתאריך זה.</div>
+                )}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-[18px] text-center text-ink-soft">אין שינויים רשומים בתאריך זה.</div>
-        )}
-      </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }

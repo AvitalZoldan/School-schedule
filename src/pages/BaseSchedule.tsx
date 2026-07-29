@@ -54,7 +54,7 @@ export default function BaseSchedule() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between print:hidden">
 
         <select
           className="rounded-lg border border-line bg-white px-3 py-2 text-[13px]"
@@ -69,6 +69,9 @@ export default function BaseSchedule() {
           ))}
         </select>
       </div>
+
+      {/* בהדפסה מוסתר בורר הכיתה שבתפריט למעלה — כותרת זו שומרת על ההקשר "איזו כיתה" בעמוד המודפס */}
+      {selectedClass && <div className="mb-3 hidden text-[13px] font-bold print:block">כיתה {selectedClass.name}</div>}
 
       {templateLoading || slotsLoading ? (
         <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
@@ -96,7 +99,7 @@ export default function BaseSchedule() {
       ) : (
         <>
           {duplicateGroups.length > 0 && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-danger-soft px-3 py-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-danger-soft px-3 py-2 print:hidden">
               <div className="text-[12.5px] text-danger">
                 נמצאו {duplicateGroups.length} חורים כפולים בתבנית זו — הם לא נראים כאן, אבל עלולים
                 לגרום לחוסר-התאמה מול הדאשבורד/שיבוץ מ"מ.
