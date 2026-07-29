@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
 import { RequireAuth } from './components/layout/RequireAuth'
+import { RequireSystemAdmin } from './components/layout/RequireSystemAdmin'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -17,6 +18,7 @@ import SubstituteList from './pages/SubstituteList'
 import Classes from './pages/Classes'
 import Employees from './pages/Employees'
 import Management from './pages/Management'
+import SystemAdmin from './pages/SystemAdmin'
 
 export default function App() {
   return (
@@ -44,6 +46,14 @@ export default function App() {
         <Route path="staff" element={<Employees />} />
         <Route path="classes" element={<Classes />} />
         <Route path="management" element={<Management />} />
+        <Route
+          path="system-admin"
+          element={
+            <RequireSystemAdmin>
+              <SystemAdmin />
+            </RequireSystemAdmin>
+          }
+        />
       </Route>
     </Routes>
   )

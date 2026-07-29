@@ -70,6 +70,22 @@ export function Sidebar() {
             {item.label}
           </NavLink>
         ))}
+
+        {profile?.is_system_admin && (
+          <NavLink
+            to="/system-admin"
+            className={({ isActive }) =>
+              [
+                'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',
+                isActive
+                  ? 'bg-accent font-semibold text-white'
+                  : 'text-[#c7cad0] hover:bg-[#2a3340] hover:text-white',
+              ].join(' ')
+            }
+          >
+            ניהול מערכת
+          </NavLink>
+        )}
       </nav>
 
       <div className="mt-4 border-t border-[#2a3340] pt-3">

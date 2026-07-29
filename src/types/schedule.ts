@@ -5,6 +5,12 @@ export type TemplateMode = 'regular' | 'camp'
 export type TemplateStatus = 'active' | 'draft'
 export type EmployeeStatus = 'permanent' | 'substitute'
 
+export interface SchoolRow {
+  id: number
+  name: string
+  active: boolean
+}
+
 export interface ClassRow {
   id: number
   school_id: number
