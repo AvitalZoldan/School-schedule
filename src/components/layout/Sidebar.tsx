@@ -7,9 +7,10 @@ const NAV_ITEMS = [
   { to: '/base', label: 'שיבוץ צוות קבוע בכיתות'},
   { to: '/missing', label: 'שיבוץ מ"מ' },
   { to: '/employee', label: 'דוח לעובדת' },
-  { to: '/leave', label: 'ניהול חופשות' },
+  { to: '/camps', label: 'ניהול קייטנות' },
   { to: '/draft', label: 'טיוטת שיבוץ' },
   { to: '/opening', label: 'מערכת פתיחות' },
+  { to: '/history', label: 'היסטוריה' },
 ] as const
 
 // קבוצת "ניהול" — הגדרות מערכת + מסכי בסיס (כיתות/עובדות) שמשמשים להקמה/תחזוקה, לא לעבודה היומיומית

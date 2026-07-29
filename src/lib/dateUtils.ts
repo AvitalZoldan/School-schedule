@@ -55,6 +55,14 @@ export function toHebrewDateLabel(d: Date): string {
   return new HDate(d).renderGematriya(true, true)
 }
 
+// עמודות timestamp without time zone נשמרות ב-DB לפי UTC (הפרויקט על Supabase עם session
+// timezone=UTC) ומוחזרות ללקוח בלי סיומת Z — יש להוסיף אותה במפורש לפני parsing, אחרת הדפדפן
+// יפרש את המחרוזת כזמן מקומי ויציג שעה שגויה בהפרש אזור הזמן. לשימוש בלשונית "היסטוריה".
+export function toLocalTimeLabel(utcTimestampWithoutTz: string): string {
+  const iso = utcTimestampWithoutTz.endsWith('Z') ? utcTimestampWithoutTz : `${utcTimestampWithoutTz}Z`
+  return new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+}
+
 // תאריך לועזי קצר, למשל "26.07.2026"
 export function toGregorianDateLabel(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0')

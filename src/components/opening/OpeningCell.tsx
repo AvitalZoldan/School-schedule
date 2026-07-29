@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { OpeningAssignmentRow } from '../../types/opening'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
-import { useUpsertOpeningAssignment } from '../../hooks/useOpeningRoster'
+import { useUpsertOpeningAssignment, type CampOpeningContext } from '../../hooks/useOpeningRoster'
 
 interface Props {
   schoolId: number
@@ -10,9 +10,17 @@ interface Props {
   assignment: OpeningAssignmentRow | undefined
   // רק העובדות שמשובצות לחור בוקר כלשהו ביום הזה — לא כל הרשימה הכללית
   availableEmployees: EmployeeWithType[]
+  campContext?: CampOpeningContext
 }
 
-export function OpeningCell({ schoolId, roleId, weekday, assignment, availableEmployees }: Props) {
+export function OpeningCell({
+  schoolId,
+  roleId,
+  weekday,
+  assignment,
+  availableEmployees,
+  campContext,
+}: Props) {
   const [open, setOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState(assignment?.notes ?? '')
   const upsert = useUpsertOpeningAssignment()
@@ -34,6 +42,7 @@ export function OpeningCell({ schoolId, roleId, weekday, assignment, availableEm
       weekday,
       employeeId,
       notes: notesDraft.trim() || null,
+      campContext,
     })
   }
 
@@ -73,6 +82,7 @@ export function OpeningCell({ schoolId, roleId, weekday, assignment, availableEm
                   weekday,
                   employeeId: val === '' ? null : Number(val),
                   notes: assignment?.notes ?? null,
+                  campContext,
                 })
               }}
             >

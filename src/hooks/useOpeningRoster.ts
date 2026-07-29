@@ -24,12 +24,19 @@ export function useOpeningRoles(schoolId: number | undefined) {
   })
 }
 
-// תפקידי הפתיחה, כל אחד עם מפת השיבוצים שלו לפי יום בשבוע (1..6) — לשנה הרגילה בלבד
-// (camp_id IS NULL; שיבוצי קיטנה מטופלים בנפרד).
-export function useOpeningRoster(schoolId: number | undefined) {
+export interface CampOpeningContext {
+  campId: number
+  weekNumber: number
+}
+
+// תפקידי הפתיחה, כל אחד עם מפת השיבוצים שלו לפי יום בשבוע (1..6) — לשנה הרגילה כברירת מחדל
+// (camp_id IS NULL). אם מועבר campContext, שולפת את הטבלה השבועית הנפרדת של אותו שבוע בתוך
+// הקייטנה (3.10: "מוגדרת טבלה נפרדת לכל שבוע") — רשימת התפקידים עצמה משותפת לכולם, רק
+// השיבוצים נבדלים.
+export function useOpeningRoster(schoolId: number | undefined, campContext?: CampOpeningContext) {
   return useQuery({
-    queryKey: ['opening-roster', schoolId],
-    enabled: !!schoolId,
+    queryKey: ['opening-roster', schoolId, campContext?.campId, campContext?.weekNumber],
+    enabled: !!schoolId && (!campContext || !!campContext.weekNumber),
     queryFn: async () => {
       const { data: roles, error: rolesError } = await supabase
         .from('opening_roles')
@@ -42,11 +49,11 @@ export function useOpeningRoster(schoolId: number | undefined) {
       const roleIds = (roles ?? []).map((r) => r.id)
       let assignments: OpeningAssignmentRow[] = []
       if (roleIds.length > 0) {
-        const { data, error } = await supabase
-          .from('opening_assignments')
-          .select('*')
-          .in('role_id', roleIds)
-          .is('camp_id', null)
+        let query = supabase.from('opening_assignments').select('*').in('role_id', roleIds)
+        query = campContext
+          ? query.eq('camp_id', campContext.campId).eq('week_number', campContext.weekNumber)
+          : query.is('camp_id', null)
+        const { data, error } = await query
         if (error) throw error
         assignments = data as OpeningAssignmentRow[]
       }
@@ -117,6 +124,7 @@ interface UpsertOpeningAssignmentInput {
   weekday: number
   employeeId: number | null
   notes?: string | null
+  campContext?: CampOpeningContext
 }
 
 export function useUpsertOpeningAssignment() {
@@ -135,15 +143,17 @@ export function useUpsertOpeningAssignment() {
           role_id: input.roleId,
           weekday: input.weekday,
           employee_id: input.employeeId,
-          camp_id: null,
-          week_number: null,
+          camp_id: input.campContext?.campId ?? null,
+          week_number: input.campContext?.weekNumber ?? null,
           notes: input.notes ?? null,
         })
         if (error) throw error
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['opening-roster', variables.schoolId] })
+      queryClient.invalidateQueries({
+        queryKey: ['opening-roster', variables.schoolId, variables.campContext?.campId, variables.campContext?.weekNumber],
+      })
     },
   })
 }

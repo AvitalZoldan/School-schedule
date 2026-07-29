@@ -8,9 +8,11 @@ import Dashboard from './pages/Dashboard'
 import BaseSchedule from './pages/BaseSchedule'
 import SubstituteAssignment from './pages/SubstituteAssignment'
 import EmployeeReport from './pages/EmployeeReport'
-import Leaves from './pages/Leaves'
+import Camps from './pages/Camps'
+import CampDetail from './pages/CampDetail'
 import Draft from './pages/Draft'
 import Opening from './pages/Opening'
+import History from './pages/History'
 import SubstituteList from './pages/SubstituteList'
 import Classes from './pages/Classes'
 import Employees from './pages/Employees'
@@ -33,9 +35,11 @@ export default function App() {
         <Route path="base" element={<BaseSchedule />} />
         <Route path="missing" element={<SubstituteAssignment />} />
         <Route path="employee" element={<EmployeeReport />} />
-        <Route path="leave" element={<Leaves />} />
+        <Route path="camps" element={<Camps />} />
+        <Route path="camps/:campId" element={<CampDetail />} />
         <Route path="draft" element={<Draft />} />
         <Route path="opening" element={<Opening />} />
+        <Route path="history" element={<History />} />
         <Route path="substitutes" element={<SubstituteList />} />
         <Route path="staff" element={<Employees />} />
         <Route path="classes" element={<Classes />} />

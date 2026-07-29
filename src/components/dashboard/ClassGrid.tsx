@@ -1,4 +1,4 @@
-import type { TemplateSlotWithEmployee } from '../../types/schedule'
+import type { DayPart, TemplateSlotWithEmployee } from '../../types/schedule'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../../types/schedule'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import type { DashboardClassData } from '../../hooks/useDashboard'
@@ -16,6 +16,9 @@ interface Props {
   occupancyMap: Map<string, SlotOccupancy>
   schoolId: number
   createdBy: string | null
+  // בדיקה נוספת (מעבר לחריגת יום-שישי המובנית) שקובעת אם חלק-יום מסוים לא רלוונטי בתאריך נתון
+  // — לשימוש במסך קייטנה, שבו טווח תאריכים יכול להיות מוגדר "בוקר בלבד" (ראו camp_periods)
+  isCellDisabled?: (date: string, dayPart: DayPart) => boolean
 }
 
 function rowKey(role: string, dayPart: string) {
@@ -34,6 +37,7 @@ export function ClassGrid({
   occupancyMap,
   schoolId,
   createdBy,
+  isCellDisabled,
 }: Props) {
   const { classRow, slots } = classData
 
@@ -109,7 +113,7 @@ export function ClassGrid({
                 </td>
                 {dates.map((date) => {
                   const wd = systemWeekday(parseISODate(date))
-                  if (dayPart === 'afternoon' && wd === FRIDAY_WD) {
+                  if ((dayPart === 'afternoon' && wd === FRIDAY_WD) || isCellDisabled?.(date, dayPart)) {
                     return (
                       <td
                         key={date}
