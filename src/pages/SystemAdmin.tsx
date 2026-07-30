@@ -314,7 +314,7 @@ function UsersPanel() {
                       </span>
                     )}
                   </td>
-                  <td className="border-t border-line px-3 py-2" dir="ltr">{user.email}</td>
+                  <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{user.email}</td>
                   <td className="border-t border-line px-3 py-2">{user.school_name}</td>
                   <td className="border-t border-line px-3 py-2">
                     {user.permission_level === 'full' ? 'הרשאה מלאה' : 'צפייה בלבד'}

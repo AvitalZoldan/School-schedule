@@ -213,8 +213,8 @@ export default function Employees() {
                       {EMPLOYEE_STATUS_LABELS[emp.status]}
                     </span>
                   </td>
-                  <td className="border-t border-line px-3 py-2" dir="ltr">{emp.phone ?? '—'}</td>
-                  <td className="border-t border-line px-3 py-2" dir="ltr">{emp.email ?? '—'}</td>
+                  <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.phone ?? '—'}</td>
+                  <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.email ?? '—'}</td>
                   <td className="border-t border-line px-3 py-2">
                     {emp.status === 'substitute' ? (emp.is_preferred ? '⭐ כן' : 'לא') : '—'}
                   </td>
