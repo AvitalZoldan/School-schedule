@@ -5,6 +5,7 @@ import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useOpeningRoster } from '../hooks/useOpeningRoster'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
+import { useHolidays } from '../hooks/useHolidays'
 import { addDays, formatDisplayDate, parseISODate, systemWeekday, toISODate, weekDates } from '../lib/dateUtils'
 import { buildResolveContext, computeOccupancyMap, occupancyKey, resolveSlotStatus } from '../lib/resolveDashboard'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../types/schedule'
@@ -56,6 +57,8 @@ export default function SubstituteAssignment() {
   const endDate = dates[dates.length - 1]
 
   const { data, isLoading } = useDashboardData(schoolId, startDate, endDate)
+  const { data: holidays } = useHolidays(schoolId, startDate, endDate)
+  const holidaySet = useMemo(() => new Set((holidays ?? []).map((h) => h.holiday_date)), [holidays])
 
   const employeesById = useMemo(
     () => new Map((allEmployees ?? []).map((e) => [e.id, e])),
@@ -80,6 +83,7 @@ export default function SubstituteAssignment() {
     if (!data || !ctx) return new Map<string, MissingItem[]>()
     const result = new Map<string, MissingItem[]>()
     for (const date of dates) {
+      if (holidaySet.has(date)) continue
       const wd = systemWeekday(parseISODate(date))
       const items: MissingItem[] = []
       for (const classData of data.classes) {
@@ -103,7 +107,7 @@ export default function SubstituteAssignment() {
       if (items.length > 0) result.set(date, items)
     }
     return result
-  }, [data, ctx, dates])
+  }, [data, ctx, dates, holidaySet])
 
   const weekdaysInRange = useMemo(
     () => [...new Set(dates.map((d) => systemWeekday(parseISODate(d))))],

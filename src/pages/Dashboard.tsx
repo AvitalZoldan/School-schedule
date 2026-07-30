@@ -6,6 +6,7 @@ import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useOpeningRoster } from '../hooks/useOpeningRoster'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
+import { useHolidays } from '../hooks/useHolidays'
 import { addDays, formatDisplayDate, parseISODate, toISODate, weekDates } from '../lib/dateUtils'
 import { buildResolveContext, computeOccupancyMap } from '../lib/resolveDashboard'
 import { WEEKDAY_LABELS } from '../types/schedule'
@@ -55,6 +56,11 @@ export default function Dashboard() {
   // (כל הכיתות/כיתה ספציפית) מוחל רק על מה שמוצג, כדי שבדיקת התפוסה/כפילות תישאר נכונה
   // גם כשבוחרים כיתה בודדת (עובדת שמשובצת בכיתה אחרת עדיין תזוהה כתפוסה).
   const { data, isLoading } = useDashboardData(schoolId, startDate, endDate)
+
+  // ימי חופש נקבעים במסך "ניהול" (Management.tsx) — כאן רק קוראים אותם כדי לנטרל תאים בתאריך כזה
+  const { data: holidays } = useHolidays(schoolId, startDate, endDate)
+  const holidaySet = useMemo(() => new Set((holidays ?? []).map((h) => h.holiday_date)), [holidays])
+
   const visibleClasses = useMemo(
     () =>
       !data
@@ -215,6 +221,7 @@ export default function Dashboard() {
                           schoolId={schoolId!}
                           createdBy={profile?.id ?? null}
                           dateDisplayMode={dateDisplayMode}
+                          isCellDisabled={(date) => holidaySet.has(date)}
                         />
                       </div>
                     ))}
