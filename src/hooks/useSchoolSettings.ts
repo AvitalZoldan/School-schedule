@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import type { DateDisplayMode } from '../lib/dateUtils'
 
 export type DashboardDefaultRange = 'day' | 'week'
 
 export interface SchoolSettingsRow {
   school_id: number
   dashboard_default_range: DashboardDefaultRange
+  date_display: DateDisplayMode
   updated_at: string
 }
 
@@ -29,7 +31,7 @@ export function useSchoolSettings(schoolId: number | undefined) {
 
 interface UpdateSchoolSettingsInput {
   schoolId: number
-  patch: Partial<Pick<SchoolSettingsRow, 'dashboard_default_range'>>
+  patch: Partial<Pick<SchoolSettingsRow, 'dashboard_default_range' | 'date_display'>>
 }
 
 export function useUpdateSchoolSettings() {

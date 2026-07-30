@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useEmployees } from '../hooks/useEmployees'
+import { useSchoolSettings } from '../hooks/useSchoolSettings'
 import { useDashboardData, type DashboardClassData } from '../hooks/useDashboard'
 import {
   addDays,
+  formatDisplayDate,
   parseISODate,
   systemWeekday,
   toGregorianDateLabel,
@@ -52,6 +54,9 @@ export default function EmployeeReport() {
   const [startDate, setStartDate] = useState(defaultWeek[0])
   const [endDate, setEndDate] = useState(defaultWeek[defaultWeek.length - 1])
   const [showClass, setShowClass] = useState(true)
+
+  const { data: schoolSettings } = useSchoolSettings(schoolId)
+  const dateDisplayMode = schoolSettings?.date_display ?? 'hebrew'
 
   const { data, isLoading } = useDashboardData(schoolId, startDate, endDate)
 
@@ -127,7 +132,7 @@ export default function EmployeeReport() {
   const selectedEmployeeName = sortedEmployees.find((e) => e.id === employeeId)?.full_name ?? ''
   const reportRangeLabel =
     startDate && endDate
-      ? `${toHebrewDateLabel(parseISODate(startDate))} – ${toHebrewDateLabel(parseISODate(endDate))}`
+      ? `${formatDisplayDate(parseISODate(startDate), dateDisplayMode)} – ${formatDisplayDate(parseISODate(endDate), dateDisplayMode)}`
       : ''
 
   return (

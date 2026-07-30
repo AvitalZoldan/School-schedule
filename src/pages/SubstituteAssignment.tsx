@@ -5,7 +5,7 @@ import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useOpeningRoster } from '../hooks/useOpeningRoster'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
-import { addDays, parseISODate, systemWeekday, toHebrewDateLabel, toISODate, weekDates } from '../lib/dateUtils'
+import { addDays, formatDisplayDate, parseISODate, systemWeekday, toISODate, weekDates } from '../lib/dateUtils'
 import { buildResolveContext, computeOccupancyMap, occupancyKey, resolveSlotStatus } from '../lib/resolveDashboard'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../types/schedule'
 import type { DayPart, TemplateSlotWithEmployee } from '../types/schedule'
@@ -33,6 +33,7 @@ export default function SubstituteAssignment() {
   const { data: allEmployees } = useEmployees(schoolId)
   const { data: openingRoles } = useOpeningRoster(schoolId)
   const { data: schoolSettings } = useSchoolSettings(schoolId)
+  const dateDisplayMode = schoolSettings?.date_display ?? 'hebrew'
 
   const [rangeMode, setRangeMode] = useState<RangeMode>('week')
   const [anchorDate, setAnchorDate] = useState<Date>(() => new Date())
@@ -176,8 +177,8 @@ export default function SubstituteAssignment() {
 
           <div className="text-[12.5px] text-ink-soft">
             {rangeMode === 'day'
-              ? toHebrewDateLabel(parseISODate(startDate))
-              : `${toHebrewDateLabel(parseISODate(startDate))} – ${toHebrewDateLabel(parseISODate(endDate))}`}
+              ? formatDisplayDate(parseISODate(startDate), dateDisplayMode)
+              : `${formatDisplayDate(parseISODate(startDate), dateDisplayMode)} – ${formatDisplayDate(parseISODate(endDate), dateDisplayMode)}`}
           </div>
         </div>
       </div>
@@ -222,7 +223,7 @@ export default function SubstituteAssignment() {
                   const dayItems = itemsByDate.get(date)!
                   const dateHeader = (
                     <div className="text-[13px] font-bold">
-                      {WEEKDAY_LABELS[wd]} · {toHebrewDateLabel(parseISODate(date))}
+                      {WEEKDAY_LABELS[wd]} · {formatDisplayDate(parseISODate(date), dateDisplayMode)}
                     </div>
                   )
 
@@ -298,7 +299,7 @@ export default function SubstituteAssignment() {
                     <div key={date} className="flex flex-col gap-1.5">
                       {dateHeader}
                       <div
-                        className="grid gap-2"
+                        className="print-grid-shrink grid gap-2"
                         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))' }}
                       >
                         {sortedGroups.map((group) => {

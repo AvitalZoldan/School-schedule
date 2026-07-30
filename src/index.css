@@ -30,4 +30,11 @@ body {
     inset: 0;
     width: 100%;
   }
+
+  /* שינוי קנה-מידה בחלון ההדפסה לא עוזר אם עמודת-רשת לא יכולה להצטמצם מתחת לרוחב מינימלי
+     קבוע (minmax בפיקסלים) — התוכן פשוט נחתך מחוץ לעמוד. ה-!important דורש כדי לגבור על
+     ה-style המוטבע שמגיע מ-JS (ראו Dashboard/CampDetail/SubstituteAssignment). */
+  .print-grid-shrink {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr)) !important;
+  }
 }

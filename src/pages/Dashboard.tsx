@@ -6,7 +6,7 @@ import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useOpeningRoster } from '../hooks/useOpeningRoster'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
-import { addDays, parseISODate, toHebrewDateLabel, toISODate, weekDates } from '../lib/dateUtils'
+import { addDays, formatDisplayDate, parseISODate, toISODate, weekDates } from '../lib/dateUtils'
 import { buildResolveContext, computeOccupancyMap } from '../lib/resolveDashboard'
 import { WEEKDAY_LABELS } from '../types/schedule'
 import { ClassGrid } from '../components/dashboard/ClassGrid'
@@ -44,10 +44,12 @@ export default function Dashboard() {
   const startDate = dates[0]
   const endDate = dates[dates.length - 1]
 
+  const dateDisplayMode = schoolSettings?.date_display ?? 'hebrew'
+
   const dateRangeLabel =
     rangeMode === 'day'
-      ? toHebrewDateLabel(parseISODate(startDate))
-      : `${toHebrewDateLabel(parseISODate(startDate))} – ${toHebrewDateLabel(parseISODate(endDate))}`
+      ? formatDisplayDate(parseISODate(startDate), dateDisplayMode)
+      : `${formatDisplayDate(parseISODate(startDate), dateDisplayMode)} – ${formatDisplayDate(parseISODate(endDate), dateDisplayMode)}`
 
   // הנתונים נשלפים תמיד עבור כל הכיתות (ראו useDashboardData) — סינון ה"היקף" הנבחר
   // (כל הכיתות/כיתה ספציפית) מוחל רק על מה שמוצג, כדי שבדיקת התפוסה/כפילות תישאר נכונה
@@ -196,7 +198,7 @@ export default function Dashboard() {
                   )}
 
                   <div
-                    className="grid gap-4"
+                    className="print-grid-shrink grid gap-4"
                     style={{
                       gridTemplateColumns: `repeat(auto-fit, minmax(${rangeMode === 'week' ? 420 : 230}px, 1fr))`,
                     }}
@@ -212,6 +214,7 @@ export default function Dashboard() {
                           occupancyMap={occupancyMap}
                           schoolId={schoolId!}
                           createdBy={profile?.id ?? null}
+                          dateDisplayMode={dateDisplayMode}
                         />
                       </div>
                     ))}

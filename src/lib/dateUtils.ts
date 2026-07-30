@@ -70,3 +70,19 @@ export function toGregorianDateLabel(d: Date): string {
   return `${day}.${month}.${d.getFullYear()}`
 }
 
+// תאריך לועזי קצר בלי שנה (יום.חודש), למשל "26.07" — לשימוש במצב "גם וגם" לצד התאריך העברי
+function toGregorianDayMonthLabel(d: Date): string {
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${day}.${month}`
+}
+
+// העדפת תצוגת תאריכים ברמת בית-ספר (מסך "ניהול", ברירת מחדל עברי) — ראו school_settings.date_display
+export type DateDisplayMode = 'hebrew' | 'gregorian' | 'both'
+
+export function formatDisplayDate(d: Date, mode: DateDisplayMode): string {
+  if (mode === 'gregorian') return toGregorianDateLabel(d)
+  if (mode === 'both') return `${toHebrewDateLabel(d)} (${toGregorianDayMonthLabel(d)})`
+  return toHebrewDateLabel(d)
+}
+

@@ -1,6 +1,7 @@
 import { useAuth } from '../lib/AuthContext'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useSchoolSettings, useUpdateSchoolSettings, type DashboardDefaultRange } from '../hooks/useSchoolSettings'
+import type { DateDisplayMode } from '../lib/dateUtils'
 import { SegmentedToggle } from '../components/common/SegmentedToggle'
 
 export default function Management() {
@@ -14,6 +15,11 @@ export default function Management() {
   function setDashboardDefaultRange(value: DashboardDefaultRange) {
     if (!schoolId) return
     updateSettings.mutate({ schoolId, patch: { dashboard_default_range: value } })
+  }
+
+  function setDateDisplay(value: DateDisplayMode) {
+    if (!schoolId) return
+    updateSettings.mutate({ schoolId, patch: { date_display: value } })
   }
 
   return (
@@ -40,6 +46,36 @@ export default function Management() {
                 options={[
                   { value: 'day', label: 'יום' },
                   { value: 'week', label: 'שבוע' },
+                ]}
+              />
+            </div>
+          )}
+
+          {!canEdit && (
+            <div className="mt-2 text-[11.5px] text-ink-soft">
+              משתמשת בהרשאת צפייה בלבד — אין אפשרות לשנות הגדרה זו.
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-line bg-panel p-[18px]">
+          <div className="mb-1 text-[13px] font-bold">תצוגת תאריכים</div>
+          <div className="mb-3 text-[12px] text-ink-soft">
+            באיזה לוח שנה יוצגו תאריכים במערכת — עברי, לועזי, או שניהם יחד.
+          </div>
+
+          {isLoading || !settings ? (
+            <div className="text-[12.5px] text-ink-soft">טוען…</div>
+          ) : (
+            <div className="print:hidden">
+              <SegmentedToggle
+                value={settings.date_display}
+                onChange={setDateDisplay}
+                disabled={!canEdit}
+                options={[
+                  { value: 'hebrew', label: 'עברי' },
+                  { value: 'gregorian', label: 'לועזי' },
+                  { value: 'both', label: 'גם וגם' },
                 ]}
               />
             </div>

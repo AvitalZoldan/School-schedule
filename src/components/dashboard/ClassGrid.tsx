@@ -3,7 +3,7 @@ import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../../types/schedule'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import type { DashboardClassData } from '../../hooks/useDashboard'
 import type { SlotOccupancy } from '../../types/dashboard'
-import { parseISODate, systemWeekday, toHebrewDateLabel } from '../../lib/dateUtils'
+import { formatDisplayDate, parseISODate, systemWeekday, type DateDisplayMode } from '../../lib/dateUtils'
 import { occupancyKey, resolveSlotStatus, type ResolveContext } from '../../lib/resolveDashboard'
 import { DashboardSlotCell } from './DashboardSlotCell'
 
@@ -16,6 +16,7 @@ interface Props {
   occupancyMap: Map<string, SlotOccupancy>
   schoolId: number
   createdBy: string | null
+  dateDisplayMode: DateDisplayMode
   // בדיקה נוספת (מעבר לחריגת יום-שישי המובנית) שקובעת אם חלק-יום מסוים לא רלוונטי בתאריך נתון
   // — לשימוש במסך קייטנה, שבו טווח תאריכים יכול להיות מוגדר "בוקר בלבד" (ראו camp_periods)
   isCellDisabled?: (date: string, dayPart: DayPart) => boolean
@@ -37,6 +38,7 @@ export function ClassGrid({
   occupancyMap,
   schoolId,
   createdBy,
+  dateDisplayMode,
   isCellDisabled,
 }: Props) {
   const { classRow, slots } = classData
@@ -89,7 +91,7 @@ export function ClassGrid({
                   className="truncate border-b border-line px-0.5 py-1.5 text-center text-[9px] leading-tight text-ink-soft"
                 >
                   <div className="truncate font-medium">{WEEKDAY_LABELS[wd] ?? date}</div>
-                  <div className="truncate opacity-60">{toHebrewDateLabel(parseISODate(date))}</div>
+                  <div className="truncate opacity-60">{formatDisplayDate(parseISODate(date), dateDisplayMode)}</div>
                 </th>
               )
             })}

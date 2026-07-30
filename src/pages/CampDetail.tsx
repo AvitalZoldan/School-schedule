@@ -6,13 +6,14 @@ import { useClasses } from '../hooks/useClasses'
 import { useEmployees } from '../hooks/useEmployees'
 import { useCamp, useCampDashboardData } from '../hooks/useCamps'
 import { useOpeningRoster } from '../hooks/useOpeningRoster'
+import { useSchoolSettings } from '../hooks/useSchoolSettings'
 import { buildResolveContext, computeOccupancyMap } from '../lib/resolveDashboard'
 import {
   addDays,
   datesInRange,
+  formatDisplayDate,
   parseISODate,
   systemWeekday,
-  toGregorianDateLabel,
   toISODate,
   weekStart,
 } from '../lib/dateUtils'
@@ -64,6 +65,8 @@ export default function CampDetail() {
   const { data: camp, isLoading: campLoading } = useCamp(campId)
   const { data: classes } = useClasses(schoolId)
   const { data: allEmployees } = useEmployees(schoolId)
+  const { data: schoolSettings } = useSchoolSettings(schoolId)
+  const dateDisplayMode = schoolSettings?.date_display ?? 'hebrew'
 
   const [scopeClassId, setScopeClassId] = useState<number | 'all'>('all')
 
@@ -160,7 +163,7 @@ export default function CampDetail() {
           </Link>
           <h1 className="mt-1 text-xl font-bold">{camp.name}</h1>
           <div className="mt-0.5 text-[13px] text-ink-soft">
-            {toGregorianDateLabel(parseISODate(camp.start_date))} – {toGregorianDateLabel(parseISODate(camp.end_date))}
+            {formatDisplayDate(parseISODate(camp.start_date), dateDisplayMode)} – {formatDisplayDate(parseISODate(camp.end_date), dateDisplayMode)}
           </div>
         </div>
 
@@ -177,7 +180,7 @@ export default function CampDetail() {
 
             <div className="min-w-[210px] text-center text-[12.5px] text-ink-soft">
               {visibleDates.length > 0
-                ? `שבוע ${weekNumber} (${toGregorianDateLabel(parseISODate(visibleDates[0]))} – ${toGregorianDateLabel(parseISODate(visibleDates[visibleDates.length - 1]))})`
+                ? `שבוע ${weekNumber} (${formatDisplayDate(parseISODate(visibleDates[0]), dateDisplayMode)} – ${formatDisplayDate(parseISODate(visibleDates[visibleDates.length - 1]), dateDisplayMode)})`
                 : 'אין תאריכים מוגדרים לקייטנה זו'}
             </div>
 
@@ -213,7 +216,7 @@ export default function CampDetail() {
           <tr>
             <th className="pb-3 text-center text-[13px] font-medium">
               {visibleDates.length > 0
-                ? `שבוע ${weekNumber} (${toGregorianDateLabel(parseISODate(visibleDates[0]))} – ${toGregorianDateLabel(parseISODate(visibleDates[visibleDates.length - 1]))})`
+                ? `שבוע ${weekNumber} (${formatDisplayDate(parseISODate(visibleDates[0]), dateDisplayMode)} – ${formatDisplayDate(parseISODate(visibleDates[visibleDates.length - 1]), dateDisplayMode)})`
                 : ''}
             </th>
           </tr>
@@ -224,7 +227,7 @@ export default function CampDetail() {
               {dashboardLoading || !dashboardData || !ctx ? (
                 <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
               ) : (
-                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))' }}>
+                <div className="print-grid-shrink grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))' }}>
                   {visibleClasses.map((classData) => (
                     <div key={classData.classRow.id} className="break-inside-avoid">
                       <ClassGrid
@@ -236,6 +239,7 @@ export default function CampDetail() {
                         occupancyMap={occupancyMap}
                         schoolId={schoolId!}
                         createdBy={profile?.id ?? null}
+                        dateDisplayMode={dateDisplayMode}
                         isCellDisabled={isCellDisabled}
                       />
                     </div>
