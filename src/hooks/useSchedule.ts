@@ -5,7 +5,64 @@ import type {
   ScheduleTemplateRow,
   TemplateMode,
   TemplateSlotWithEmployee,
+  TemplateStatus,
 } from '../types/schedule'
+
+export interface SlotForConflictCheck {
+  id: number
+  template_id: number
+  class_id: number
+  weekday: number
+  day_part: 'morning' | 'afternoon'
+  role: string
+  assigned_employee_id: number | null
+}
+
+// כל החורים המשובצים לעובדת קבועה בבית הספר הנוכחי (school_id שהועבר) — בכל הכיתות שלו,
+// עבור תבניות מאותו mode+status — לבדיקת כפילות שיבוץ (אותה עובדת, אותו weekday+day_part,
+// בין אם בכיתה אחרת ובין אם בתפקיד אחר באותה כיתה) לפני שמירת שיבוץ חדש ב-SlotCell.
+// נשלף בנפרד מ-useTemplateSlots כי המסך (BaseSchedule/Draft) מציג כיתה אחת בכל פעם, אבל
+// הכפילות רלוונטית על פני כל הכיתות של אותו בית ספר (לא בתי ספר אחרים).
+export function useSchoolSlotsForConflictCheck(
+  schoolId: number | undefined,
+  mode: TemplateMode,
+  status: TemplateStatus,
+) {
+  return useQuery({
+    queryKey: ['school-slots-conflict-check', schoolId, mode, status],
+    enabled: !!schoolId,
+    queryFn: async () => {
+      const { data: templates, error: templatesError } = await supabase
+        .from('schedule_templates')
+        .select('id, class_id')
+        .eq('school_id', schoolId!)
+        .eq('mode', mode)
+        .eq('status', status)
+      if (templatesError) throw templatesError
+
+      const templateIds = (templates ?? []).map((t) => t.id)
+      if (templateIds.length === 0) return [] as SlotForConflictCheck[]
+
+      const { data: slots, error: slotsError } = await supabase
+        .from('template_slots')
+        .select('id, template_id, weekday, day_part, role, assigned_employee_id')
+        .in('template_id', templateIds)
+        .not('assigned_employee_id', 'is', null)
+      if (slotsError) throw slotsError
+
+      const classIdByTemplateId = new Map((templates ?? []).map((t) => [t.id, t.class_id]))
+      return (slots ?? []).map((s) => ({
+        id: s.id,
+        template_id: s.template_id,
+        class_id: classIdByTemplateId.get(s.template_id)!,
+        weekday: s.weekday,
+        day_part: s.day_part,
+        role: s.role,
+        assigned_employee_id: s.assigned_employee_id,
+      })) as SlotForConflictCheck[]
+    },
+  })
+}
 
 // שולף את התבנית ה"active" היחידה עבור כיתה+מצב (אוכף גם ב-DB ע"י unique index)
 export function useActiveTemplate(classId: number | undefined, mode: TemplateMode) {
@@ -90,6 +147,7 @@ export function useCleanupDuplicateSlots() {
       queryClient.invalidateQueries({ queryKey: ['template-slots', variables.templateId] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['classes'] })
+      queryClient.invalidateQueries({ queryKey: ['school-slots-conflict-check'] })
     },
   })
 }
@@ -130,6 +188,7 @@ export function useSeedDefaultSlots() {
       queryClient.invalidateQueries({ queryKey: ['template-slots', variables.templateId] })
       queryClient.invalidateQueries({ queryKey: ['classes'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['school-slots-conflict-check'] })
     },
   })
 }
@@ -165,6 +224,7 @@ function invalidateScheduleQueries(queryClient: ReturnType<typeof useQueryClient
   queryClient.invalidateQueries({ queryKey: ['active-template', classId, mode] })
   queryClient.invalidateQueries({ queryKey: ['classes'] })
   queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+  queryClient.invalidateQueries({ queryKey: ['school-slots-conflict-check'] })
 }
 
 // יוצרת טיוטה חדשה לכיתה: מעתיקה את כל החורים מהתבנית הפעילה (אם קיימת) לתבנית חדשה
@@ -342,6 +402,9 @@ export function useUpdateSlot() {
       // ממשיכים להראות מטמון ישן של השיבוץ הבסיסי עד שפעולה אחרת (למשל שיבוץ מ"מ) מרעננת אותם
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['classes'] })
+      // בלי זה, בדיקת הכפילות (SlotCell) ממשיכה להראות שיבוץ ישן (תפקיד/כיתה) אחרי שהוא שונה —
+      // בדיוק המקרה שגרם להודעת "היא כבר משובצת כמורה" למרות שכבר הוחלפה לסייעת
+      queryClient.invalidateQueries({ queryKey: ['school-slots-conflict-check'] })
     },
   })
 }

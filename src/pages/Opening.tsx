@@ -119,6 +119,7 @@ export default function Opening() {
                         weekday={wd}
                         assignment={role.assignments[wd]}
                         availableEmployees={morningStaffByWeekday?.[wd] ?? []}
+                        roster={roster ?? []}
                       />
                     ) : (
                       <td key={wd} />

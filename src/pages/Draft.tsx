@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useClasses } from '../hooks/useClasses'
 import { useEmployees } from '../hooks/useEmployees'
@@ -9,6 +9,7 @@ import {
   useDiscardDraft,
   useDraftTemplate,
   useTemplateSlots,
+  useSchoolSlotsForConflictCheck,
 } from '../hooks/useSchedule'
 import { useConfirm } from '../components/common/ConfirmProvider'
 import { WeekGrid } from '../components/schedule/WeekGrid'
@@ -31,6 +32,8 @@ export default function Draft() {
   const { data: activeTemplate, isLoading: activeLoading } = useActiveTemplate(classId, 'regular')
   const { data: draftTemplate, isLoading: draftLoading } = useDraftTemplate(classId, 'regular')
   const { data: draftSlots, isLoading: slotsLoading } = useTemplateSlots(draftTemplate?.id)
+  const { data: conflictSlots } = useSchoolSlotsForConflictCheck(schoolId, 'regular', 'draft')
+  const classNameById = useMemo(() => new Map((classes ?? []).map((c) => [c.id, c.name])), [classes])
 
   const createDraft = useCreateDraft()
   const discardDraft = useDiscardDraft()
@@ -170,7 +173,13 @@ export default function Draft() {
           {slotsLoading ? (
             <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
           ) : (
-            <WeekGrid slots={draftSlots ?? []} employees={employees ?? []} templateId={draftTemplate.id} />
+            <WeekGrid
+              slots={draftSlots ?? []}
+              employees={employees ?? []}
+              templateId={draftTemplate.id}
+              conflictSlots={conflictSlots}
+              classNameById={classNameById}
+            />
           )}
         </div>
       )}

@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import type { OpeningAssignmentRow } from '../../types/opening'
+import type { OpeningAssignmentRow, OpeningRoleWithAssignments } from '../../types/opening'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useUpsertOpeningAssignment, type CampOpeningContext } from '../../hooks/useOpeningRoster'
+import { useConfirm } from '../common/ConfirmProvider'
+import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 
 interface Props {
   schoolId: number
@@ -10,6 +12,9 @@ interface Props {
   assignment: OpeningAssignmentRow | undefined
   // רק העובדות שמשובצות לחור בוקר כלשהו ביום הזה — לא כל הרשימה הכללית
   availableEmployees: EmployeeWithType[]
+  // כל תפקידי הפתיחה עם השיבוצים שלהם (אותו הקשר: רגיל, או אותה קייטנה+שבוע) — לבדיקה
+  // שאותה עובדת לא משובצת כבר לתפקיד פתיחה אחר באותו יום (פתיחה היא "פעם אחת ביום")
+  roster: OpeningRoleWithAssignments[]
   campContext?: CampOpeningContext
 }
 
@@ -19,11 +24,13 @@ export function OpeningCell({
   weekday,
   assignment,
   availableEmployees,
+  roster,
   campContext,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState(assignment?.notes ?? '')
   const upsert = useUpsertOpeningAssignment()
+  const confirm = useConfirm()
 
   const employeeId = assignment?.employee_id ?? null
   const employee = availableEmployees.find((e) => e.id === employeeId)
@@ -73,14 +80,38 @@ export function OpeningCell({
             <select
               className="rounded border border-line bg-white px-1.5 py-1 text-[12px]"
               value={employeeId ?? ''}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const val = e.target.value
+                const newEmployeeId = val === '' ? null : Number(val)
+                if (newEmployeeId !== null) {
+                  const conflictRole = roster.find(
+                    (r) => r.id !== roleId && r.assignments[weekday]?.employee_id === newEmployeeId,
+                  )
+                  if (conflictRole) {
+                    const employeeName =
+                      availableEmployees.find((emp) => emp.id === newEmployeeId)?.full_name ?? 'העובדת'
+                    const message = buildTransferConfirmMessage(employeeName, `ביום זה לתפקיד פתיחה "${conflictRole.name}"`)
+                    if (!(await confirm(message))) return
+                    const conflictAssignment = conflictRole.assignments[weekday]
+                    if (conflictAssignment) {
+                      await upsert.mutateAsync({
+                        schoolId,
+                        assignmentId: conflictAssignment.id,
+                        roleId: conflictRole.id,
+                        weekday,
+                        employeeId: null,
+                        notes: conflictAssignment.notes ?? null,
+                        campContext,
+                      })
+                    }
+                  }
+                }
                 upsert.mutate({
                   schoolId,
                   assignmentId: assignment?.id,
                   roleId,
                   weekday,
-                  employeeId: val === '' ? null : Number(val),
+                  employeeId: newEmployeeId,
                   notes: assignment?.notes ?? null,
                   campContext,
                 })

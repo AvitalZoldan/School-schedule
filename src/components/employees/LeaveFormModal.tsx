@@ -16,6 +16,7 @@ import { datesInRange, parseISODate, systemWeekday, toGregorianDateLabel, toISOD
 import { DAY_PART_LABELS, WEEKDAY_LABELS, type DayPart } from '../../types/schedule'
 import { SubstituteCombobox } from '../dashboard/SubstituteCombobox'
 import { useConfirm } from '../common/ConfirmProvider'
+import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 
 const REMINDER_PRESETS = [3, 7, 14]
 
@@ -149,14 +150,22 @@ export function LeaveFormModal({ schoolId, employee, existingLeave, createdBy, o
       }
       const employeeName = allEmployees?.find((e) => e.id === employeeId)?.full_name ?? ''
       const ok = await confirm(
-        `${employeeName} כבר משובצת ב${conflict.className} ${DAY_PART_LABELS[conflict.dayPart]} - ${conflict.role} באותו תאריך. האם למחוק אותה משם ולשבץ כאן?`,
+        buildTransferConfirmMessage(
+          employeeName,
+          `ב${conflict.className} ${DAY_PART_LABELS[conflict.dayPart]} בתפקיד "${conflict.role}" באותו תאריך`,
+        ),
       )
       if (!ok) return
 
-      if (conflict.kind === 'filled_sub' && conflict.assignmentId) {
-        clearAssignment.mutate({ schoolId, assignmentId: conflict.assignmentId })
-      } else if (conflict.kind === 'filled_permanent') {
-        markAbsence.mutate({ schoolId, employeeId, date, reportedBy: createdBy })
+      try {
+        if (conflict.kind === 'filled_sub' && conflict.assignmentId) {
+          await clearAssignment.mutateAsync({ schoolId, assignmentId: conflict.assignmentId })
+        } else if (conflict.kind === 'filled_permanent') {
+          await markAbsence.mutateAsync({ schoolId, employeeId, date, reportedBy: createdBy })
+        }
+      } catch (error) {
+        alert(`פינוי השיבוץ הקודם נכשל: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`)
+        return
       }
     }
 

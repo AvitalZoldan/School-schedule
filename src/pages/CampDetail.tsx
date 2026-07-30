@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useAuth } from '../lib/AuthContext'
 import { useClasses } from '../hooks/useClasses'
-import { useEmployees } from '../hooks/useEmployees'
+import { useEmployees, type EmployeeWithType } from '../hooks/useEmployees'
 import { useCamp, useCampDashboardData } from '../hooks/useCamps'
 import { useOpeningRoster } from '../hooks/useOpeningRoster'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
@@ -110,6 +110,27 @@ export default function CampDetail() {
   }
 
   const employeesById = useMemo(() => new Map((allEmployees ?? []).map((e) => [e.id, e])), [allEmployees])
+
+  // עובדות המשובצות לחור בוקר כלשהו (בכיתה כלשהי), לפי יום בשבוע — מתוך שיבוץ הקייטנה הפעיל
+  // (לא השנה הרגילה). זו רשימת הבחירה המוגבלת לתפקידי פתיחה בקייטנה, מקביל ל-
+  // useMorningStaffByWeekday של מסך "מערכת פתיחות" הרגיל.
+  const campMorningStaffByWeekday = useMemo(() => {
+    const byWeekday = new Map<number, Map<number, EmployeeWithType>>()
+    for (const classData of dashboardData?.classes ?? []) {
+      for (const slot of classData.slots) {
+        if (slot.day_part !== 'morning' || !slot.assigned_employee_id) continue
+        const emp = employeesById.get(slot.assigned_employee_id)
+        if (!emp) continue
+        if (!byWeekday.has(slot.weekday)) byWeekday.set(slot.weekday, new Map())
+        byWeekday.get(slot.weekday)!.set(emp.id, emp)
+      }
+    }
+    const result: Record<number, EmployeeWithType[]> = {}
+    for (const [wd, empMap] of byWeekday.entries()) {
+      result[wd] = [...empMap.values()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'he'))
+    }
+    return result
+  }, [dashboardData, employeesById])
 
   const ctx = useMemo(
     () =>
@@ -296,7 +317,8 @@ export default function CampDetail() {
                               roleId={role.id}
                               weekday={wd}
                               assignment={role.assignments[wd]}
-                              availableEmployees={allEmployees ?? []}
+                              availableEmployees={campMorningStaffByWeekday[wd] ?? []}
+                              roster={openingRoster ?? []}
                               campContext={{ campId, weekNumber }}
                             />
                           ) : (

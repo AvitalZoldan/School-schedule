@@ -1,12 +1,15 @@
 import type { TemplateSlotWithEmployee } from '../../types/schedule'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../../types/schedule'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
+import type { SlotForConflictCheck } from '../../hooks/useSchedule'
 import { SlotCell } from './SlotCell'
 
 interface Props {
   slots: TemplateSlotWithEmployee[]
   employees: EmployeeWithType[]
   templateId: number
+  conflictSlots?: SlotForConflictCheck[]
+  classNameById?: Map<number, string>
 }
 
 // מפתח שורה = צירוף (role, day_part) — כל צירוף כזה הוא שורה אחת בטבלה,
@@ -19,7 +22,7 @@ function rowKey(role: string, dayPart: string) {
 const FRIDAY_WEEKDAY = Object.entries(WEEKDAY_LABELS).find(([, label]) => label === 'שישי')?.[0]
 const FRIDAY_WD = FRIDAY_WEEKDAY !== undefined ? Number(FRIDAY_WEEKDAY) : undefined
 
-export function WeekGrid({ slots, employees, templateId }: Props) {
+export function WeekGrid({ slots, employees, templateId, conflictSlots, classNameById }: Props) {
   if (slots.length === 0) {
     return (
       <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">
@@ -109,6 +112,8 @@ export function WeekGrid({ slots, employees, templateId }: Props) {
                       templateId={templateId}
                       topBorderClass={topBorderClass}
                       notes={slot.notes}
+                      conflictSlots={conflictSlots}
+                      classNameById={classNameById}
                     />
                   )
                 })}

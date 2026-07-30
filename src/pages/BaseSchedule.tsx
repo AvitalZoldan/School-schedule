@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useClasses } from '../hooks/useClasses'
@@ -8,6 +8,7 @@ import {
   useCleanupDuplicateSlots,
   useSeedDefaultSlots,
   useTemplateSlots,
+  useSchoolSlotsForConflictCheck,
   findDuplicateSlotGroups,
 } from '../hooks/useSchedule'
 import { WeekGrid } from '../components/schedule/WeekGrid'
@@ -43,10 +44,12 @@ export default function BaseSchedule() {
 
   const { data: template, isLoading: templateLoading } = useActiveTemplate(classId, 'regular')
   const { data: slots, isLoading: slotsLoading } = useTemplateSlots(template?.id)
+  const { data: conflictSlots } = useSchoolSlotsForConflictCheck(schoolId, 'regular', 'active')
   const seedDefaultSlots = useSeedDefaultSlots()
   const cleanupDuplicates = useCleanupDuplicateSlots()
 
   const selectedClass = classes?.find((c) => c.id === classId)
+  const classNameById = useMemo(() => new Map((classes ?? []).map((c) => [c.id, c.name])), [classes])
 
   // חורים כפולים (אותו weekday+day_part+role) בלתי-נראים כאן (WeekGrid מציג שורה אחת לכל
   // צירוף), אבל גורמים לחוסר-התאמה מול הדאשבורד — ראו findDuplicateSlotGroups
@@ -119,7 +122,13 @@ export default function BaseSchedule() {
               </button>
             </div>
           )}
-          <WeekGrid slots={slots ?? []} employees={employees ?? []} templateId={template.id} />
+          <WeekGrid
+            slots={slots ?? []}
+            employees={employees ?? []}
+            templateId={template.id}
+            conflictSlots={conflictSlots}
+            classNameById={classNameById}
+          />
         </>
       )}
     </div>

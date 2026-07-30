@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import type { Criticality, TemplateSlotWithEmployee } from '../../types/schedule'
+import { DAY_PART_LABELS, WEEKDAY_LABELS, type Criticality, type TemplateSlotWithEmployee } from '../../types/schedule'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
-import { useUpdateSlot } from '../../hooks/useSchedule'
+import { useUpdateSlot, type SlotForConflictCheck } from '../../hooks/useSchedule'
+import { useConfirm } from '../common/ConfirmProvider'
+import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 import { EmployeeCombobox } from './EmployeeCombobox'
 
 const CRITICALITY_LABEL: Record<Criticality, string> = {
@@ -22,6 +24,10 @@ interface Props {
   templateId: number
   topBorderClass?: string
   notes: string | null
+  // כל החורים המשובצים בבית הספר (כל הכיתות) עבור אותה תבנית mode+status — לבדיקת כפילות
+  // שיבוץ לפני שמירה. ראו useSchoolSlotsForConflictCheck.
+  conflictSlots?: SlotForConflictCheck[]
+  classNameById?: Map<number, string>
 }
 
 export function SlotCell({
@@ -29,6 +35,8 @@ export function SlotCell({
   employees,
   templateId,
   topBorderClass = 'border-t border-line',
+  conflictSlots,
+  classNameById,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState(slot.notes || '')
@@ -41,6 +49,7 @@ export function SlotCell({
     })
   }
   const updateSlot = useUpdateSlot()
+  const confirm = useConfirm()
   const isTeacher = slot.role.includes('מורה')
 
   const displayLabel = slot.employee
@@ -82,7 +91,30 @@ export function SlotCell({
           <EmployeeCombobox
             employees={employees}
             value={slot.assigned_employee_id}
-            onChange={(employeeId) => {
+            onChange={async (employeeId) => {
+              if (employeeId !== null) {
+                const conflict = conflictSlots?.find(
+                  (s) =>
+                    s.id !== slot.id &&
+                    s.weekday === slot.weekday &&
+                    s.day_part === slot.day_part &&
+                    s.assigned_employee_id === employeeId,
+                )
+                if (conflict) {
+                  const employeeName = employees.find((e) => e.id === employeeId)?.full_name ?? 'העובדת'
+                  const className = classNameById?.get(conflict.class_id) ?? '?'
+                  const message = buildTransferConfirmMessage(
+                    employeeName,
+                    `ביום ${WEEKDAY_LABELS[slot.weekday]} ${DAY_PART_LABELS[slot.day_part]} בתפקיד "${conflict.role}" בכיתה ${className}`,
+                  )
+                  if (!(await confirm(message))) return
+                  await updateSlot.mutateAsync({
+                    slotId: conflict.id,
+                    templateId: conflict.template_id,
+                    assigned_employee_id: null,
+                  })
+                }
+              }
               updateSlot.mutate({
                 slotId: slot.id,
                 templateId,

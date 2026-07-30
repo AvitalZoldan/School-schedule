@@ -5,6 +5,7 @@ import type { SlotDayStatus, SlotOccupancy } from '../../types/dashboard'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useAssignDailySlot, useClearDailyAssignment, useMarkAbsence } from '../../hooks/useDashboard'
 import { useConfirm } from '../common/ConfirmProvider'
+import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 import { SubstituteCombobox } from './SubstituteCombobox'
 
 interface Props {
@@ -40,23 +41,31 @@ export function DashboardSlotCell({
   const markAbsence = useMarkAbsence()
   const confirm = useConfirm()
 
-  function performAssign(employeeId: number, existingAssignmentId?: number) {
-    assignSlot.mutate({
-      schoolId,
-      slotId: slot.id,
-      date,
-      employeeId,
-      classId,
-      role: slot.role,
-      dayPart: slot.day_part,
-      createdBy,
-      existingAssignmentId,
-    })
+  async function performAssign(employeeId: number, existingAssignmentId?: number) {
+    try {
+      await assignSlot.mutateAsync({
+        schoolId,
+        slotId: slot.id,
+        date,
+        employeeId,
+        classId,
+        role: slot.role,
+        dayPart: slot.day_part,
+        createdBy,
+        existingAssignmentId,
+      })
+    } catch (error) {
+      alert(`השיבוץ נכשל: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`)
+      return
+    }
     setOpen(false)
   }
 
   // בוחרים עובדת שכבר תפוסה במקום אחר לאותו תאריך+חלק-יום: לפני שמשבצים אותה כאן, מבקשים
   // אישור "להעביר" אותה — כלומר לפנות אותה מהחור הישן ולשבץ בחדש (במקום לחסום את הבחירה מראש).
+  // חשוב: הפינוי חייב להסתיים (await) לפני השיבוץ החדש — אחרת שני השינויים רצים במקביל, ואם
+  // השיבוץ החדש מגיע ל-DB לפני שהפינוי הסתיים, ה-constraint שמונע כפילות חוסם אותו (בשקט,
+  // בלי הודעת שגיאה) בעוד שהפינוי הישן כבר הצליח — התוצאה: העובדת נעלמת מהמקור ולא מופיעה ביעד.
   async function handleSelect(employeeId: number, existingAssignmentId?: number) {
     const occupancy = getOccupancy(employeeId)
     const isCurrentSlot =
@@ -70,13 +79,21 @@ export function DashboardSlotCell({
         return
       }
       const employeeName = employeesById.get(employeeId)?.full_name ?? ''
-      const message = `האם למחוק את ${employeeName} מ${occupancy.className} ${DAY_PART_LABELS[occupancy.dayPart]} - ${occupancy.role}?`
+      const message = buildTransferConfirmMessage(
+        employeeName,
+        `ב${occupancy.className} ${DAY_PART_LABELS[occupancy.dayPart]} בתפקיד "${occupancy.role}"`,
+      )
       if (!(await confirm(message))) return
 
-      if (occupancy.kind === 'filled_sub' && occupancy.assignmentId) {
-        clearAssignment.mutate({ schoolId, assignmentId: occupancy.assignmentId })
-      } else if (occupancy.kind === 'filled_permanent') {
-        markAbsence.mutate({ schoolId, employeeId, date, reportedBy: createdBy })
+      try {
+        if (occupancy.kind === 'filled_sub' && occupancy.assignmentId) {
+          await clearAssignment.mutateAsync({ schoolId, assignmentId: occupancy.assignmentId })
+        } else if (occupancy.kind === 'filled_permanent') {
+          await markAbsence.mutateAsync({ schoolId, employeeId, date, reportedBy: createdBy })
+        }
+      } catch (error) {
+        alert(`פינוי השיבוץ הקודם נכשל: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`)
+        return
       }
     }
     performAssign(employeeId, existingAssignmentId)
