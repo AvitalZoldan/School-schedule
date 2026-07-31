@@ -6,6 +6,9 @@ import type { EmployeeWithType } from '../../hooks/useEmployees'
 interface Props {
   employee: EmployeeWithType | null | undefined
   children: ReactNode
+  // כשמוגדר, מוסיף כפתור אדום "לא הגיעה היום" מעל "מעבר לפרטי עובדת" — כרגע רק ה-Dashboard
+  // מעביר את זה, לשיבוץ קבוע (filled_permanent) בלבד, כי רק שם יש משמעות לסימון היעדרות.
+  onMarkAbsent?: () => void
 }
 
 // עוטף כל הופעה של שם עובדת (בכל טבלה/רשת באפליקציה) בטולטיפ ריחוף גנרי: כפתור קטן בלבד
@@ -19,7 +22,7 @@ interface Props {
 // הטריגר הפנימי ("מעבר לפרטי עובדת") הוא span עם role="button" ולא <button> אמיתי: הרבה מוקדי
 // שימוש (SlotCell/DashboardSlotCell/AuxiliaryCell) כבר מציגים את השם בתוך <button> שפותח פופ-אובר
 // שיבוץ — button מקונן בתוך button הוא HTML לא תקין, ולכן משתמשים ב-span+stopPropagation במקום.
-export function EmployeeHoverCard({ employee, children }: Props) {
+export function EmployeeHoverCard({ employee, children, onMarkAbsent }: Props) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number; openAbove: boolean } | null>(null)
   const triggerRef = useRef<HTMLSpanElement>(null)
@@ -65,6 +68,12 @@ export function EmployeeHoverCard({ employee, children }: Props) {
     navigate(`/staff?search=${encodeURIComponent(employee!.full_name)}`)
   }
 
+  function markAbsent(e: React.SyntheticEvent) {
+    e.stopPropagation()
+    setOpen(false)
+    onMarkAbsent?.()
+  }
+
   return (
     <span ref={triggerRef} className="relative" onMouseEnter={show} onMouseLeave={scheduleHide}>
       {children}
@@ -80,8 +89,19 @@ export function EmployeeHoverCard({ employee, children }: Props) {
               bottom: pos.openAbove ? window.innerHeight - pos.top : undefined,
               right: pos.right,
             }}
-            className="z-50 rounded-lg border border-line bg-panel p-1 shadow-lg"
+            className="z-50 flex flex-col gap-1 rounded-lg border border-line bg-panel p-1 shadow-lg"
           >
+            {onMarkAbsent && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={markAbsent}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && markAbsent(e)}
+                className="block cursor-pointer whitespace-nowrap rounded-md bg-danger px-2.5 py-1.5 text-center text-[11.5px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                לא הגיעה היום
+              </span>
+            )}
             <span
               role="button"
               tabIndex={0}

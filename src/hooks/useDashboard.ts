@@ -177,10 +177,13 @@ interface MarkAbsenceInput {
   schoolId: number
   employeeId: number
   date: string
+  // חלק-היום הספציפי שממנו מסמנים את ההיעדרות (בוקר/צהריים) — כדי שסימון "לא הגיעה" בצהריים
+  // לא יפנה גם את השיבוץ שלה בבוקר של אותו יום.
+  dayPart: DayPart
   reportedBy: string | null
 }
 
-// כפתור "לא הגיעה היום" (3.6-א): פותחת חור זמני ליום זה בלבד, בלי לגעת בשיבוץ הקבוע.
+// כפתור "לא הגיעה היום" (3.6-א): פותחת חור זמני לחלק-היום שנלחץ בלבד, בלי לגעת בשיבוץ הקבוע.
 export function useMarkAbsence() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -189,6 +192,7 @@ export function useMarkAbsence() {
         school_id: input.schoolId,
         employee_id: input.employeeId,
         absence_date: input.date,
+        day_part: input.dayPart,
         reported_by: input.reportedBy,
       })
       if (error) throw error

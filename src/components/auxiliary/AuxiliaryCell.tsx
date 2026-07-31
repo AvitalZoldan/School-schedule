@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AuxiliaryAssignmentRow, AuxiliaryRoleWithAssignments } from '../../types/auxiliary'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useUpsertAuxiliaryAssignment, type CampAuxiliaryContext } from '../../hooks/useAuxiliarySystems'
+import { useClickOutside } from '../../hooks/useClickOutside'
 import { useConfirm } from '../common/ConfirmProvider'
 import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
@@ -38,6 +39,7 @@ export function AuxiliaryCell({
   const [notesDraft, setNotesDraft] = useState(assignment?.notes ?? '')
   const upsert = useUpsertAuxiliaryAssignment()
   const confirm = useConfirm()
+  const cellRef = useClickOutside<HTMLTableCellElement>(open, () => setOpen(false))
 
   const employeeId = assignment?.employee_id ?? null
   const employee = employeeId != null ? employeesById.get(employeeId) : undefined
@@ -61,7 +63,7 @@ export function AuxiliaryCell({
   }
 
   return (
-    <td className="relative border-t border-line px-1.5 py-2 align-top">
+    <td ref={cellRef} className="relative border-t border-line px-1.5 py-2 align-top">
       <button
         type="button"
         onClick={openPopover}

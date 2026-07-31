@@ -4,6 +4,7 @@ import { DAY_PART_LABELS } from '../../types/schedule'
 import type { SlotDayStatus, SlotOccupancy } from '../../types/dashboard'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useAssignDailySlot, useClearDailyAssignment, useMarkAbsence } from '../../hooks/useDashboard'
+import { useClickOutside } from '../../hooks/useClickOutside'
 import { useConfirm } from '../common/ConfirmProvider'
 import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
@@ -41,6 +42,7 @@ export function DashboardSlotCell({
   const clearAssignment = useClearDailyAssignment()
   const markAbsence = useMarkAbsence()
   const confirm = useConfirm()
+  const cellRef = useClickOutside<HTMLTableCellElement>(open, () => setOpen(false))
 
   async function performAssign(employeeId: number, existingAssignmentId?: number) {
     try {
@@ -90,7 +92,7 @@ export function DashboardSlotCell({
         if (occupancy.kind === 'filled_sub' && occupancy.assignmentId) {
           await clearAssignment.mutateAsync({ schoolId, assignmentId: occupancy.assignmentId })
         } else if (occupancy.kind === 'filled_permanent') {
-          await markAbsence.mutateAsync({ schoolId, employeeId, date, reportedBy: createdBy })
+          await markAbsence.mutateAsync({ schoolId, employeeId, date, dayPart: occupancy.dayPart, reportedBy: createdBy })
         }
       } catch (error) {
         alert(`פינוי השיבוץ הקודם נכשל: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`)
@@ -122,44 +124,59 @@ export function DashboardSlotCell({
   const label = labelEmployee?.full_name ?? (status.kind === 'missing' ? 'חור ריק' : '—')
 
   return (
-    <td className={`relative ${topBorderClass} px-0.5 py-1.5 align-top`}>
+    <td ref={cellRef} className={`relative ${topBorderClass} px-0.5 py-1.5 align-top`}>
       {isCritical && (
         <span className="absolute -top-1.5 -right-1.5 z-10 rounded-full bg-danger px-1 py-0.5 text-[8.5px] font-semibold text-white">
           קריטי
         </span>
       )}
-      <button
-        type="button"
-        title={label}
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full overflow-hidden rounded-md border-r-[3px] border-current px-1 py-1 text-right text-[10px] transition-opacity hover:opacity-80 ${cellClass}`}
-      >
-        <div className="truncate">
-          {labelEmployee ? <EmployeeHoverCard employee={labelEmployee}>{label}</EmployeeHoverCard> : label}
+      {status.kind === 'filled_permanent' ? (
+        <div
+          title={label}
+          className={`w-full overflow-hidden rounded-md border-r-[3px] border-current px-1 py-1 text-right text-[10px] ${cellClass}`}
+        >
+          <div className="truncate">
+            {labelEmployee ? (
+              <EmployeeHoverCard
+                employee={labelEmployee}
+                onMarkAbsent={() =>
+                  markAbsence.mutate({
+                    schoolId,
+                    employeeId: status.employeeId,
+                    date,
+                    dayPart: slot.day_part,
+                    reportedBy: createdBy,
+                  })
+                }
+              >
+                {label}
+              </EmployeeHoverCard>
+            ) : (
+              label
+            )}
+          </div>
         </div>
-        {status.kind === 'filled_sub' && (
-          <div className="truncate text-[9px] font-normal opacity-70">מ"מ</div>
-        )}
-        {status.kind === 'filled_leave_sub' && (
-          <div className="truncate text-[9px] font-normal opacity-70">מ"מ (חופשה)</div>
-        )}
-      </button>
+      ) : (
+        <button
+          type="button"
+          title={label}
+          onClick={() => setOpen((o) => !o)}
+          className={`w-full overflow-hidden rounded-md border-r-[3px] border-current px-1 py-1 text-right text-[10px] transition-opacity hover:opacity-80 ${cellClass}`}
+        >
+          <div className="truncate">
+            {labelEmployee ? <EmployeeHoverCard employee={labelEmployee}>{label}</EmployeeHoverCard> : label}
+          </div>
+          {status.kind === 'filled_sub' && (
+            <div className="truncate text-[9px] font-normal opacity-70">מ"מ</div>
+          )}
+          {status.kind === 'filled_leave_sub' && (
+            <div className="truncate text-[9px] font-normal opacity-70">מ"מ (חופשה)</div>
+          )}
+        </button>
+      )}
 
       {open && (
         <div className="absolute z-20 mt-1 w-56 rounded-md border border-line bg-panel p-2 shadow-md">
-          {status.kind === 'filled_permanent' && (
-            <button
-              type="button"
-              onClick={() => {
-                markAbsence.mutate({ schoolId, employeeId: status.employeeId, date, reportedBy: createdBy })
-                setOpen(false)
-              }}
-              className="w-full rounded bg-warn-soft px-2 py-1.5 text-right text-[12px] text-warn hover:opacity-80"
-            >
-              לא הגיעה היום
-            </button>
-          )}
-
           {status.kind === 'missing' && (
             <SubstituteCombobox
               employees={allEmployees}

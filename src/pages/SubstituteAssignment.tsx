@@ -214,7 +214,7 @@ export default function SubstituteAssignment() {
               onClick={() => setAnchorDate(new Date())}
               className="rounded-md border border-line bg-white px-3 py-1.5 text-[12.5px] hover:bg-[#f2f0ea]"
             >
-              היום
+              {rangeMode === 'week' ? 'השבוע' : 'היום'}
             </button>
             <button
               type="button"

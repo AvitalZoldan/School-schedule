@@ -19,6 +19,8 @@ export interface DailyAbsenceRow {
   school_id: number
   employee_id: number
   absence_date: string
+  // null = יום שלם (רשומות ישנות, מלפני התמיכה בחלוקה) — ראו hasAbsence ב-resolveDashboard.ts
+  day_part: DayPart | null
   reported_by: string | null
   reported_at: string
   notes: string | null

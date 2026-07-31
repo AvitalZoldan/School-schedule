@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { DAY_PART_LABELS, WEEKDAY_LABELS, type Criticality, type TemplateSlotWithEmployee } from '../../types/schedule'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useUpdateSlot, type SlotForConflictCheck } from '../../hooks/useSchedule'
+import { useClickOutside } from '../../hooks/useClickOutside'
 import { useConfirm } from '../common/ConfirmProvider'
 import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
@@ -51,6 +52,7 @@ export function SlotCell({
   }
   const updateSlot = useUpdateSlot()
   const confirm = useConfirm()
+  const cellRef = useClickOutside<HTMLTableCellElement>(open, () => setOpen(false))
   const isTeacher = slot.role.includes('מורה')
 
   const displayLabel = slot.employee
@@ -72,7 +74,7 @@ export function SlotCell({
       : 'bg-warn-soft text-warn'
 
   return (
-    <td className={`relative ${topBorderClass} px-2 py-2 align-top`}>
+    <td ref={cellRef} className={`relative ${topBorderClass} px-2 py-2 align-top`}>
       {!slot.employee && slot.criticality === 'critical' && (
         <span className="absolute -top-1.5 -right-1.5 z-10 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger">
           קריטי

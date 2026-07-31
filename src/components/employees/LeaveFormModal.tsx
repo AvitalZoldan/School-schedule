@@ -162,7 +162,7 @@ export function LeaveFormModal({ schoolId, employee, existingLeave, createdBy, o
         if (conflict.kind === 'filled_sub' && conflict.assignmentId) {
           await clearAssignment.mutateAsync({ schoolId, assignmentId: conflict.assignmentId })
         } else if (conflict.kind === 'filled_permanent') {
-          await markAbsence.mutateAsync({ schoolId, employeeId, date, reportedBy: createdBy })
+          await markAbsence.mutateAsync({ schoolId, employeeId, date, dayPart: conflict.dayPart, reportedBy: createdBy })
         }
       } catch (error) {
         alert(`פינוי השיבוץ הקודם נכשל: ${error instanceof Error ? error.message : 'שגיאה לא ידועה'}`)

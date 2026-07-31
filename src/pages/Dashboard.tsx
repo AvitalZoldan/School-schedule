@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [rangeMode, setRangeMode] = useState<RangeMode>('week')
   const [anchorDate, setAnchorDate] = useState<Date>(() => new Date())
   const [scopeClassId, setScopeClassId] = useState<number | 'all'>('all')
+  const [gapsCollapsed, setGapsCollapsed] = useState(false)
 
   // מיישם את ברירת המחדל (יום/שבוע) ממסך "ניהול" פעם אחת עם טעינת ההגדרות, כדי לא לדרוס
   // בחירה ידנית של המשתמשת בהמשך אם ה-query מתעדכן ברקע.
@@ -181,7 +182,7 @@ export default function Dashboard() {
               onClick={() => setAnchorDate(new Date())}
               className="rounded-md border border-line bg-white px-3 py-1.5 text-[12.5px] hover:bg-[#f2f0ea]"
             >
-              היום
+              {rangeMode === 'week' ? 'השבוע' : 'היום'}
             </button>
             <button
               type="button"
@@ -193,6 +194,16 @@ export default function Dashboard() {
           </div>
 
           <div className="text-[12.5px] text-ink-soft">{dateRangeLabel}</div>
+
+          <input
+            type="date"
+            value={toISODate(anchorDate)}
+            onChange={(e) => {
+              if (!e.target.value) return
+              setAnchorDate(parseISODate(e.target.value))
+            }}
+            className="rounded-md border border-line bg-white px-2 py-1.5 text-[12.5px]"
+          />
 
           <select
             className="rounded-lg border border-line bg-white px-3 py-2 text-[13px]"
@@ -232,30 +243,42 @@ export default function Dashboard() {
                 <div className="flex flex-col gap-5">
                   {auxiliaryGaps.length > 0 && (
                     <div className="rounded-xl border border-line bg-panel p-3 print:hidden">
-                      <div className="mb-2 text-[13px] font-bold">חורי מערכות עזר</div>
-                      <div className="flex flex-col gap-1.5">
-                        {auxiliaryGaps.map((gap) => (
-                          <div key={`${gap.roleId}:${gap.date}`} className="flex items-center gap-2">
-                            <div className="w-32 shrink-0 text-[12px] text-ink-soft">
-                              {WEEKDAY_LABELS[gap.weekday]} · {formatDisplayDate(parseISODate(gap.date), dateDisplayMode)}
+                      <button
+                        type="button"
+                        onClick={() => setGapsCollapsed((v) => !v)}
+                        className="mb-2 flex w-full items-center justify-between text-[13px] font-bold"
+                      >
+                        <span>
+                          חורי מערכות עזר{' '}
+                          <span className="font-normal text-ink-soft">({auxiliaryGaps.length})</span>
+                        </span>
+                        <span className="text-ink-soft">{gapsCollapsed ? '▸' : '▾'}</span>
+                      </button>
+                      {!gapsCollapsed && (
+                        <div className="flex flex-col gap-1.5">
+                          {auxiliaryGaps.map((gap) => (
+                            <div key={`${gap.roleId}:${gap.date}`} className="flex items-center gap-2">
+                              <div className="w-32 shrink-0 text-[12px] text-ink-soft">
+                                {WEEKDAY_LABELS[gap.weekday]} · {formatDisplayDate(parseISODate(gap.date), dateDisplayMode)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <AuxiliaryGapRow
+                                  gap={gap}
+                                  availableStaff={(allEmployees ?? []).filter((e) =>
+                                    presenceByDate(gap.sourceDayPart).get(gap.date)?.has(e.id),
+                                  )}
+                                  employeesById={employeesById}
+                                  getOccupancy={(employeeId) =>
+                                    auxiliaryOccupancy(occupancyMap, gap.date, gap.sourceDayPart, employeeId)
+                                  }
+                                  schoolId={schoolId!}
+                                  createdBy={profile?.id ?? null}
+                                />
+                              </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <AuxiliaryGapRow
-                                gap={gap}
-                                availableStaff={(allEmployees ?? []).filter((e) =>
-                                  presenceByDate(gap.sourceDayPart).get(gap.date)?.has(e.id),
-                                )}
-                                employeesById={employeesById}
-                                getOccupancy={(employeeId) =>
-                                  auxiliaryOccupancy(occupancyMap, gap.date, gap.sourceDayPart, employeeId)
-                                }
-                                schoolId={schoolId!}
-                                createdBy={profile?.id ?? null}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 

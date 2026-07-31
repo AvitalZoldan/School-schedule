@@ -15,7 +15,8 @@ import { parseISODate, systemWeekday } from './dateUtils'
 // "הקשר פתרון" — מבני עזר (Map/Set) בנויים פעם אחת מהנתונים שנשלפו לטווח הנבחר,
 // כדי שפתרון כל תא יהיה חיפוש O(1) ולא סריקה חוזרת.
 export interface ResolveContext {
-  absenceSet: Set<string> // `${employeeId}:${date}`
+  // `${employeeId}:${date}:${dayPart|'all'}` — 'all' מייצג רשומה ישנה של יום שלם (day_part null)
+  absenceSet: Set<string>
   leavesByEmployee: Map<number, EmployeeLeaveRow[]>
   leaveSubBySlotDate: Map<string, LeaveDayAssignmentRow> // key: `${slotId}:${date}`
   dailyAssignBySlotDate: Map<string, DailyAssignmentRow> // key: `${slotId}:${date}`
@@ -26,7 +27,7 @@ export function buildResolveContext(
   leaves: EmployeeLeaveRow[],
   dailyAssignments: DailyAssignmentRow[],
 ): ResolveContext {
-  const absenceSet = new Set(absences.map((a) => `${a.employee_id}:${a.absence_date}`))
+  const absenceSet = new Set(absences.map((a) => `${a.employee_id}:${a.absence_date}:${a.day_part ?? 'all'}`))
 
   const leavesByEmployee = new Map<number, EmployeeLeaveRow[]>()
   const leaveSubBySlotDate = new Map<string, LeaveDayAssignmentRow>()
@@ -52,10 +53,25 @@ function isOnLeave(ctx: ResolveContext, employeeId: number, date: string): boole
   return leaves.some((l) => l.start_date <= date && date <= l.end_date)
 }
 
+// היעדרות חד-פעמית בתאריך זה: אם dayPart מצוין, בודקת רק אותו חלק-יום (בנוסף לרשומות "יום
+// שלם" ישנות) — כדי שהיעדרות שסומנה על חלק-יום אחד (למשל צהריים) לא תשפיע על החלק השני (בוקר)
+// באותה כיתה/תפקיד. בלי dayPart (משמש לבדיקות ברמת "כל היום", כמו מועמדות למ"מ ממקור "all"),
+// בודקת אם יש היעדרות בכלל, לא משנה לאיזה חלק-יום.
+function hasAbsence(ctx: ResolveContext, employeeId: number, date: string, dayPart?: DayPart): boolean {
+  if (dayPart) {
+    return ctx.absenceSet.has(`${employeeId}:${date}:${dayPart}`) || ctx.absenceSet.has(`${employeeId}:${date}:all`)
+  }
+  return (
+    ctx.absenceSet.has(`${employeeId}:${date}:morning`) ||
+    ctx.absenceSet.has(`${employeeId}:${date}:afternoon`) ||
+    ctx.absenceSet.has(`${employeeId}:${date}:all`)
+  )
+}
+
 // נעדרת (היעדרות חד-פעמית) או בחופשה בתאריך זה — משמש גם לפתרון תא כיתה (למעלה) וגם לזיהוי
 // "חור פתיחה" (למטה), כדי ששני המקומות יתבססו על אותה הגדרת זמינות.
-export function isEmployeeUnavailable(ctx: ResolveContext, employeeId: number, date: string): boolean {
-  return ctx.absenceSet.has(`${employeeId}:${date}`) || isOnLeave(ctx, employeeId, date)
+export function isEmployeeUnavailable(ctx: ResolveContext, employeeId: number, date: string, dayPart?: DayPart): boolean {
+  return hasAbsence(ctx, employeeId, date, dayPart) || isOnLeave(ctx, employeeId, date)
 }
 
 // פותר חור בודד לתאריך קונקרטי — הלב של "דאשבורד + ניהול חוסרים" (5.2).
@@ -69,7 +85,7 @@ export function resolveSlotStatus(
   const baseEmployeeId = slot.assigned_employee_id
 
   if (baseEmployeeId) {
-    const isAbsent = ctx.absenceSet.has(`${baseEmployeeId}:${date}`)
+    const isAbsent = hasAbsence(ctx, baseEmployeeId, date, slot.day_part)
     const onLeave = isOnLeave(ctx, baseEmployeeId, date)
 
     if (!isAbsent && !onLeave) {
@@ -239,7 +255,14 @@ export function computeAuxiliaryGaps(
       if (!system.show_in_missing) continue
       for (const role of roles) {
         const assignedId = role.assignments[weekday]?.employee_id ?? null
-        const isGap = assignedId === null || isEmployeeUnavailable(ctx, assignedId, date)
+        const isGap =
+          assignedId === null ||
+          isEmployeeUnavailable(
+            ctx,
+            assignedId,
+            date,
+            system.source_day_part === 'all' ? undefined : system.source_day_part,
+          )
         if (!isGap) continue
         result.push({
           date,
