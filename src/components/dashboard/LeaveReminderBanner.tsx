@@ -1,15 +1,18 @@
 import { useLeaveReminders, useDismissLeaveReminder } from '../../hooks/useLeaves'
 import { parseISODate, toGregorianDateLabel } from '../../lib/dateUtils'
+import { useAuth } from '../../lib/AuthContext'
 
 interface Props {
   schoolId: number
 }
 
 // באנר תזכורת "X ימים לפני חזרה" (3.7 באפיון): מופיע בראש הדשבורד כשהגיע תאריך התזכורת של
-// חופשה פעילה. סגירה ע"י המשתמשת מסמנת reminder_dismissed=true ולא תוצג שוב (אלא אם טווח
-// החופשה נערך מחדש — ראו useUpdateLeave).
+// חופשה פעילה. סגירה ע"י המשתמשת פר-משתמשת (leave_reminder_dismissals) — לא תוצג שוב
+// עבורה, אך ממשיכה להופיע אצל שאר המשתמשות עד שכל אחת תסגור בעצמה (אלא אם טווח החופשה נערך
+// מחדש — ראו useUpdateLeave).
 export function LeaveReminderBanner({ schoolId }: Props) {
-  const { data: reminders } = useLeaveReminders(schoolId)
+  const { profile } = useAuth()
+  const { data: reminders } = useLeaveReminders(schoolId, profile?.id)
   const dismissReminder = useDismissLeaveReminder()
 
   if (!reminders || reminders.length === 0) return null
@@ -24,7 +27,7 @@ export function LeaveReminderBanner({ schoolId }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => dismissReminder.mutate({ schoolId, leaveId: leave.id })}
+            onClick={() => profile && dismissReminder.mutate({ schoolId, leaveId: leave.id, profileId: profile.id })}
             className="shrink-0 rounded-md border border-warn px-2 py-1 text-[12px] hover:bg-white/40"
           >
             הבנתי

@@ -35,6 +35,14 @@ export interface LeaveDayAssignmentRow {
   employee_id: number
 }
 
+export interface LeaveReminderDismissalRow {
+  id: number
+  school_id: number
+  leave_id: number
+  profile_id: string
+  dismissed_at: string
+}
+
 export interface EmployeeLeaveRow {
   id: number
   school_id: number
@@ -42,7 +50,6 @@ export interface EmployeeLeaveRow {
   start_date: string
   end_date: string
   reminder_days_before: number
-  reminder_dismissed: boolean
   notes: string | null
   status: 'active' | 'cancelled'
   leave_day_assignments?: LeaveDayAssignmentRow[]
