@@ -53,6 +53,22 @@ export function Sidebar() {
           </NavLink>
         ))}
 
+        {profile?.is_school_admin && !profile?.is_system_admin && (
+          <NavLink
+            to="/manage-users"
+            className={({ isActive }) =>
+              [
+                'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',
+                isActive
+                  ? 'bg-accent font-semibold text-white'
+                  : 'text-[#c7cad0] hover:bg-[#2a3340] hover:text-white',
+              ].join(' ')
+            }
+          >
+            ניהול משתמשים
+          </NavLink>
+        )}
+
         {profile?.is_system_admin && (
           <>
             <NavLink

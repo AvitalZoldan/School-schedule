@@ -39,6 +39,7 @@ interface UpdateSchoolInput {
   schoolId: number
   name?: string
   active?: boolean
+  max_full_access_users?: number
 }
 
 export function useUpdateSchool() {

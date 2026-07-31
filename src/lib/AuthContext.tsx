@@ -11,6 +11,7 @@ export interface Profile {
   permission_level: PermissionLevel
   active: boolean
   is_system_admin: boolean
+  is_school_admin: boolean
 }
 
 interface AuthContextValue {
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // (school_id, permission_level) — ראו הערה בסכימה למה אין טבלת users נפרדת
     supabase
       .from('profiles')
-      .select('id, school_id, full_name, permission_level, active, is_system_admin')
+      .select('id, school_id, full_name, permission_level, active, is_system_admin, is_school_admin')
       .eq('id', session.user.id)
       .single()
       .then(({ data, error }) => {

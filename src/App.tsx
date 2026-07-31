@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
 import { RequireAuth } from './components/layout/RequireAuth'
 import { RequireSystemAdmin } from './components/layout/RequireSystemAdmin'
+import { RequireSchoolAdmin } from './components/layout/RequireSchoolAdmin'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -19,6 +20,7 @@ import Classes from './pages/Classes'
 import Employees from './pages/Employees'
 import Management from './pages/Management'
 import SystemAdmin from './pages/SystemAdmin'
+import ManageUsers from './pages/ManageUsers'
 import ContactRequests from './pages/ContactRequests'
 
 export default function App() {
@@ -53,6 +55,14 @@ export default function App() {
             <RequireSystemAdmin>
               <SystemAdmin />
             </RequireSystemAdmin>
+          }
+        />
+        <Route
+          path="manage-users"
+          element={
+            <RequireSchoolAdmin>
+              <ManageUsers />
+            </RequireSchoolAdmin>
           }
         />
         <Route
