@@ -3,22 +3,40 @@ import { useAuth } from '../lib/AuthContext'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
-import { useOpeningRoster } from '../hooks/useOpeningRoster'
+import { useDailyOpeningAssignments, useOpeningRoster } from '../hooks/useOpeningRoster'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
 import { useHolidays } from '../hooks/useHolidays'
 import { addDays, formatDisplayDate, parseISODate, systemWeekday, toISODate, weekDates } from '../lib/dateUtils'
-import { buildResolveContext, computeOccupancyMap, occupancyKey, resolveSlotStatus } from '../lib/resolveDashboard'
+import {
+  buildResolveContext,
+  computeMorningPresenceByDate,
+  computeOccupancyMap,
+  computeOpeningGaps,
+  occupancyKey,
+  resolveSlotStatus,
+} from '../lib/resolveDashboard'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../types/schedule'
 import type { DayPart, TemplateSlotWithEmployee } from '../types/schedule'
 import type { SlotDayStatus } from '../types/dashboard'
 import { SegmentedToggle } from '../components/common/SegmentedToggle'
 import { MissingSlotRow } from '../components/missing/MissingSlotRow'
+import { OpeningGapRow } from '../components/opening/OpeningGapRow'
 
 type RangeMode = 'day' | 'week'
 type ViewMode = 'byClass' | 'byDayPart'
 
 const FRIDAY_WEEKDAY = Object.entries(WEEKDAY_LABELS).find(([, label]) => label === 'שישי')?.[0]
 const FRIDAY_WD = FRIDAY_WEEKDAY !== undefined ? Number(FRIDAY_WEEKDAY) : undefined
+
+// שבת (weekday=7) תמיד סגורה — בתצוגת "יום" (בניגוד ל"שבוע", ש-weekDates תמיד מחזירה ראשון-שישי)
+// ניווט חופשי יכול לנחות עליה ולהציג עמוד ריק לגמרי, לכן מדלגים
+function skipSaturday(date: Date, direction: 1 | -1): Date {
+  let d = date
+  while (systemWeekday(d) === 7) {
+    d = addDays(d, direction)
+  }
+  return d
+}
 
 interface MissingItem {
   slot: TemplateSlotWithEmployee
@@ -49,6 +67,14 @@ export default function SubstituteAssignment() {
     }
   }, [schoolSettings])
 
+  // מכסה גם מעבר יזום מ"שבוע" ל"יום" וגם את ברירת המחדל מ"ניהול" (למעלה) — בכל מקרה שבו
+  // העוגן נתקע על שבת בתצוגת יום, מדלגים קדימה ליום הראשון הבא שכן פעיל
+  useEffect(() => {
+    if (rangeMode === 'day' && systemWeekday(anchorDate) === 7) {
+      setAnchorDate((d) => skipSaturday(d, 1))
+    }
+  }, [rangeMode, anchorDate])
+
   const dates = useMemo(
     () => (rangeMode === 'day' ? [toISODate(anchorDate)] : weekDates(anchorDate)),
     [rangeMode, anchorDate],
@@ -57,6 +83,7 @@ export default function SubstituteAssignment() {
   const endDate = dates[dates.length - 1]
 
   const { data, isLoading } = useDashboardData(schoolId, startDate, endDate)
+  const { data: dailyOpeningAssignments } = useDailyOpeningAssignments(schoolId, startDate, endDate)
   const { data: holidays } = useHolidays(schoolId, startDate, endDate)
   const holidaySet = useMemo(() => new Set((holidays ?? []).map((h) => h.holiday_date)), [holidays])
 
@@ -76,7 +103,10 @@ export default function SubstituteAssignment() {
   )
 
   function shift(deltaDays: number) {
-    setAnchorDate((d) => addDays(d, deltaDays))
+    setAnchorDate((d) => {
+      const next = addDays(d, deltaDays)
+      return rangeMode === 'day' ? skipSaturday(next, deltaDays > 0 ? 1 : -1) : next
+    })
   }
 
   const itemsByDate = useMemo(() => {
@@ -109,22 +139,19 @@ export default function SubstituteAssignment() {
     return result
   }, [data, ctx, dates, holidaySet])
 
-  const weekdaysInRange = useMemo(
-    () => [...new Set(dates.map((d) => systemWeekday(parseISODate(d))))],
-    [dates],
+  // "חורי פתיחה" (5.7-ג המורחב): לכל תאריך בטווח, תפקיד פתיחה שאין לו כיסוי בפועל — או כי הוא
+  // לא מאויש בכלל בשיבוץ השבועי, או כי העובדת המשובצת נעדרת/בחופשה אותו יום ספציפי. בשני
+  // המקרים ניתן לשבץ מ"מ ישירות מכאן (daily_opening_assignments), בלי לגעת בשיבוץ השבועי הקבוע.
+  const openingGaps = useMemo(
+    () => (openingRoles && ctx ? computeOpeningGaps(openingRoles, dates, ctx, dailyOpeningAssignments ?? []) : []),
+    [openingRoles, ctx, dates, dailyOpeningAssignments],
   )
-  const missingOpening = useMemo(() => {
-    if (!openingRoles) return []
-    const result: { weekday: number; roleName: string }[] = []
-    for (const role of openingRoles) {
-      for (const wd of weekdaysInRange) {
-        if (!role.assignments[wd]?.employee_id) {
-          result.push({ weekday: wd, roleName: role.name })
-        }
-      }
-    }
-    return result
-  }, [openingRoles, weekdaysInRange])
+
+  // מי בפועל בבניין בבוקר כל תאריך (לא השיבוץ השבועי הסטטי) — לרשימת המועמדות למ"מ פתיחה
+  const morningPresenceByDate = useMemo(
+    () => (data && ctx ? computeMorningPresenceByDate(data.classes, dates, ctx) : new Map<string, Set<number>>()),
+    [data, ctx, dates],
+  )
 
   const totalOpen = useMemo(
     () => [...itemsByDate.values()].flat().filter((i) => i.status.kind === 'missing').length,
@@ -191,18 +218,31 @@ export default function SubstituteAssignment() {
         <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
       ) : (
         <div className="flex flex-col gap-5">
-          {missingOpening.length > 0 && (
+          {openingGaps.length > 0 && (
             <div className="rounded-xl border border-line bg-panel p-3 print:hidden">
-              <div className="mb-2 text-[13px] font-bold">תפקידי פתיחה לא-מאוישים</div>
-              <ul className="flex flex-col gap-1 text-[12.5px]">
-                {missingOpening.map((m, i) => (
-                  <li key={i} className="text-warn">
-                    {WEEKDAY_LABELS[m.weekday]} — {m.roleName}
-                  </li>
+              <div className="mb-2 text-[13px] font-bold">חורי פתיחה</div>
+              <div className="flex flex-col gap-1.5">
+                {openingGaps.map((gap) => (
+                  <div key={`${gap.roleId}:${gap.date}`} className="flex items-center gap-2">
+                    <div className="w-32 shrink-0 text-[12px] text-ink-soft">
+                      {WEEKDAY_LABELS[gap.weekday]} · {formatDisplayDate(parseISODate(gap.date), dateDisplayMode)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <OpeningGapRow
+                        gap={gap}
+                        morningStaff={(allEmployees ?? []).filter((e) =>
+                          morningPresenceByDate.get(gap.date)?.has(e.id),
+                        )}
+                        employeesById={employeesById}
+                        getOccupancy={(employeeId) =>
+                          occupancyMap.get(occupancyKey(gap.date, 'morning', employeeId)) ?? null
+                        }
+                        schoolId={schoolId!}
+                        createdBy={profile?.id ?? null}
+                      />
+                    </div>
+                  </div>
                 ))}
-              </ul>
-              <div className="mt-2 text-[11.5px] text-ink-soft">
-                לעריכה יש לפתוח את מסך "מערכת פתיחות".
               </div>
             </div>
           )}

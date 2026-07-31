@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { EmployeeWithType } from './useEmployees'
 import type {
+  DailyOpeningAssignmentRow,
   OpeningAssignmentRow,
   OpeningRoleRow,
   OpeningRoleWithAssignments,
@@ -111,6 +112,90 @@ export function useMorningStaffByWeekday(schoolId: number | undefined) {
       }
       return result
     },
+  })
+}
+
+// מ"מ פתיחה חד-פעמיים שנקבעו בפועל בטווח התאריכים הנבחר (כשהעובדת הקבועה נעדרת/בחופשה
+// באותו תאריך) — משמש את הדשבורד ואת מסך "שיבוץ מ"מ" כדי לזהות אילו תפקידי פתיחה כבר שובצו
+// ואילו עדיין פתוחים.
+export function useDailyOpeningAssignments(
+  schoolId: number | undefined,
+  startDate: string | undefined,
+  endDate: string | undefined,
+) {
+  return useQuery({
+    queryKey: ['daily-opening-assignments', schoolId, startDate, endDate],
+    enabled: !!schoolId && !!startDate && !!endDate,
+    queryFn: async (): Promise<DailyOpeningAssignmentRow[]> => {
+      const { data, error } = await supabase
+        .from('daily_opening_assignments')
+        .select('*')
+        .eq('school_id', schoolId!)
+        .gte('opening_date', startDate!)
+        .lte('opening_date', endDate!)
+      if (error) throw error
+      return data as DailyOpeningAssignmentRow[]
+    },
+  })
+}
+
+interface AssignDailyOpeningInput {
+  schoolId: number
+  roleId: number
+  date: string
+  employeeId: number
+  createdBy: string | null
+  existingAssignmentId?: number
+}
+
+// משבצת מ"מ לתפקיד פתיחה לתאריך קונקרטי — אותה לוגיקת update-by-id/insert כמו
+// useAssignDailySlot (אין unique constraint ב-DB, אז לא סומכים על upsert-by-conflict).
+export function useAssignDailyOpening() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: AssignDailyOpeningInput) => {
+      if (input.existingAssignmentId) {
+        const { error } = await supabase
+          .from('daily_opening_assignments')
+          .update({ employee_id: input.employeeId })
+          .eq('id', input.existingAssignmentId)
+          .eq('school_id', input.schoolId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('daily_opening_assignments').insert({
+          school_id: input.schoolId,
+          role_id: input.roleId,
+          opening_date: input.date,
+          employee_id: input.employeeId,
+          created_by: input.createdBy,
+        })
+        if (error) throw error
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['daily-opening-assignments', variables.schoolId] })
+    },
+  })
+}
+
+interface ClearDailyOpeningInput {
+  schoolId: number
+  assignmentId: number
+}
+
+// מבטלת מ"מ פתיחה חד-פעמי שכבר שובץ (מחזירה את התפקיד למצב "פתוח" לאותו תאריך)
+export function useClearDailyOpening() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ schoolId, assignmentId }: ClearDailyOpeningInput) => {
+      const { error } = await supabase
+        .from('daily_opening_assignments')
+        .delete()
+        .eq('id', assignmentId)
+        .eq('school_id', schoolId)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['daily-opening-assignments'] }),
   })
 }
 

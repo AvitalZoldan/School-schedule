@@ -7,6 +7,7 @@ import type {
   SlotDayStatus,
   SlotOccupancy,
 } from '../types/dashboard'
+import type { DailyOpeningAssignmentRow, OpeningRoleWithAssignments } from '../types/opening'
 import { parseISODate, systemWeekday } from './dateUtils'
 
 // "הקשר פתרון" — מבני עזר (Map/Set) בנויים פעם אחת מהנתונים שנשלפו לטווח הנבחר,
@@ -47,6 +48,12 @@ function isOnLeave(ctx: ResolveContext, employeeId: number, date: string): boole
   const leaves = ctx.leavesByEmployee.get(employeeId)
   if (!leaves) return false
   return leaves.some((l) => l.start_date <= date && date <= l.end_date)
+}
+
+// נעדרת (היעדרות חד-פעמית) או בחופשה בתאריך זה — משמש גם לפתרון תא כיתה (למעלה) וגם לזיהוי
+// "חור פתיחה" (למטה), כדי ששני המקומות יתבססו על אותה הגדרת זמינות.
+export function isEmployeeUnavailable(ctx: ResolveContext, employeeId: number, date: string): boolean {
+  return ctx.absenceSet.has(`${employeeId}:${date}`) || isOnLeave(ctx, employeeId, date)
 }
 
 // פותר חור בודד לתאריך קונקרטי — הלב של "דאשבורד + ניהול חוסרים" (5.2).
@@ -125,4 +132,78 @@ export function computeOccupancyMap(
 
 export function occupancyKey(date: string, dayPart: DayPart, employeeId: number): string {
   return `${date}:${dayPart}:${employeeId}`
+}
+
+// מי בפועל נמצאת בבניין בבוקר של תאריך קונקרטי (בכל כיתה שהיא) — אחרי פתרון היעדרויות/חופשות/
+// מ"מ יומיים לאותו תאריך ספציפי. שונה מ-useMorningStaffByWeekday (המשמש את מסך "מערכת פתיחות"),
+// שמבוסס רק על השיבוץ השבועי הסטטי ולכן עלול לכלול מי שהיום הזה עצמה נעדרת/הועברה לכיסוי אחר.
+// משמש לרשימת המועמדות למ"מ פתיחה חד-פעמי (5.7-ג המורחב).
+export function computeMorningPresenceByDate(
+  classes: { slots: TemplateSlotWithEmployee[] }[],
+  dates: string[],
+  ctx: ResolveContext,
+): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>()
+  for (const date of dates) {
+    const weekday = systemWeekday(parseISODate(date))
+    const present = new Set<number>()
+    for (const classData of classes) {
+      for (const slot of classData.slots) {
+        if (slot.weekday !== weekday || slot.day_part !== 'morning') continue
+        const status = resolveSlotStatus(slot, date, ctx)
+        if (
+          status.kind === 'filled_permanent' ||
+          status.kind === 'filled_sub' ||
+          status.kind === 'filled_leave_sub'
+        ) {
+          present.add(status.employeeId)
+        }
+      }
+    }
+    map.set(date, present)
+  }
+  return map
+}
+
+// "חור פתיחה" לתאריך קונקרטי: תפקיד פתיחה שאין לו כיסוי בפועל באותו יום — או כי הוא לא מאויש
+// בכלל בשיבוץ השבועי (absentEmployeeId: null), או כי הוא כן מאויש אבל העובדת המשובצת נעדרת/
+// בחופשה באותו תאריך בלבד. מטופל כחור אחיד (5.7-ג המורחב) — בשני המקרים אפשר לשבץ מ"מ ישירות
+// דרך daily_opening_assignments, בלי לגעת בשיבוץ השבועי הקבוע במסך "מערכת פתיחות".
+export interface OpeningGap {
+  date: string
+  weekday: number
+  roleId: number
+  roleName: string
+  absentEmployeeId: number | null
+  dailyAssignment?: DailyOpeningAssignmentRow
+}
+
+export function computeOpeningGaps(
+  openingRoles: OpeningRoleWithAssignments[],
+  dates: string[],
+  ctx: ResolveContext,
+  dailyOpeningAssignments: DailyOpeningAssignmentRow[],
+): OpeningGap[] {
+  const byRoleDate = new Map<string, DailyOpeningAssignmentRow>()
+  for (const a of dailyOpeningAssignments) byRoleDate.set(`${a.role_id}:${a.opening_date}`, a)
+
+  const result: OpeningGap[] = []
+  for (const date of dates) {
+    const weekday = systemWeekday(parseISODate(date))
+    if (weekday === 7) continue // שבת — מסך "מערכת פתיחות" מנהל רק ימים 1-6, אין שם מה לאייש
+    for (const role of openingRoles) {
+      const assignedId = role.assignments[weekday]?.employee_id ?? null
+      const isGap = assignedId === null || isEmployeeUnavailable(ctx, assignedId, date)
+      if (!isGap) continue
+      result.push({
+        date,
+        weekday,
+        roleId: role.id,
+        roleName: role.name,
+        absentEmployeeId: assignedId,
+        dailyAssignment: byRoleDate.get(`${role.id}:${date}`),
+      })
+    }
+  }
+  return result
 }
