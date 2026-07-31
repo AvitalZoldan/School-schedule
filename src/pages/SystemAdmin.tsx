@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import type { PermissionLevel } from '../lib/AuthContext'
 import { useSchools, useCreateSchool, useUpdateSchool } from '../hooks/useSchools'
@@ -8,10 +8,11 @@ import {
   useUpdateAdminProfile,
   type AdminProfileRow,
 } from '../hooks/useAdminUsers'
+import { useSystemSettings, useUpdateSystemSettings } from '../hooks/useSystemSettings'
 import type { SchoolRow } from '../types/schedule'
 import { useConfirm } from '../components/common/ConfirmProvider'
 
-type Tab = 'schools' | 'users'
+type Tab = 'schools' | 'users' | 'settings'
 
 const emptyInviteForm = {
   email: '',
@@ -55,9 +56,71 @@ export default function SystemAdmin() {
         >
           משתמשים
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('settings')}
+          className={[
+            'px-3 py-2 text-[13.5px] font-medium',
+            tab === 'settings' ? 'border-b-2 border-accent text-accent' : 'text-ink-soft hover:text-ink',
+          ].join(' ')}
+        >
+          הגדרות
+        </button>
       </div>
 
-      {tab === 'schools' ? <SchoolsPanel /> : <UsersPanel />}
+      {tab === 'schools' ? <SchoolsPanel /> : tab === 'users' ? <UsersPanel /> : <SettingsPanel />}
+    </div>
+  )
+}
+
+function SettingsPanel() {
+  const { data: settings, isLoading } = useSystemSettings()
+  const updateSettings = useUpdateSystemSettings()
+  const [idleTimeout, setIdleTimeout] = useState(15)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (settings) setIdleTimeout(settings.idle_timeout_minutes)
+  }, [settings])
+
+  async function handleSave() {
+    setSaved(false)
+    await updateSettings.mutateAsync({ idleTimeoutMinutes: idleTimeout })
+    setSaved(true)
+  }
+
+  if (isLoading) return <div className="text-ink-soft">טוען…</div>
+
+  return (
+    <div className="max-w-[420px] rounded-xl border border-line bg-panel p-5">
+      <label className="block">
+        <span className="mb-1 block text-[13px] font-medium">ניתוק אוטומטי לאחר חוסר פעילות (בדקות)</span>
+        <span className="mb-2 block text-[12px] text-ink-soft">
+          משתמשות ינותקו אוטומטית מהמערכת לאחר שהות ללא כל פעילות למשך פרק הזמן הזה.
+        </span>
+        <input
+          type="number"
+          min={1}
+          value={idleTimeout}
+          onChange={(e) => {
+            setSaved(false)
+            setIdleTimeout(Number(e.target.value))
+          }}
+          className="w-32 rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
+        />
+      </label>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={updateSettings.isPending || idleTimeout <= 0}
+          className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {updateSettings.isPending ? 'שומרת…' : 'שמירה'}
+        </button>
+        {saved && <span className="text-[12.5px] text-accent">נשמר</span>}
+      </div>
     </div>
   )
 }

@@ -195,15 +195,18 @@ export default function Dashboard() {
 
           <div className="text-[12.5px] text-ink-soft">{dateRangeLabel}</div>
 
-          <input
-            type="date"
-            value={toISODate(anchorDate)}
-            onChange={(e) => {
-              if (!e.target.value) return
-              setAnchorDate(parseISODate(e.target.value))
-            }}
-            className="rounded-md border border-line bg-white px-2 py-1.5 text-[12.5px]"
-          />
+          <label className="flex items-center gap-1.5 text-[12.5px] text-ink-soft">
+            עבור לתאריך
+            <input
+              type="date"
+              value={toISODate(anchorDate)}
+              onChange={(e) => {
+                if (!e.target.value) return
+                setAnchorDate(parseISODate(e.target.value))
+              }}
+              className="rounded-md border border-line bg-white px-2 py-1.5 text-[12.5px] text-ink"
+            />
+          </label>
 
           <select
             className="rounded-lg border border-line bg-white px-3 py-2 text-[13px]"
