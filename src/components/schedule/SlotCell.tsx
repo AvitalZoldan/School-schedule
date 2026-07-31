@@ -3,6 +3,7 @@ import { DAY_PART_LABELS, WEEKDAY_LABELS, type Criticality, type TemplateSlotWit
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useUpdateSlot, type SlotForConflictCheck } from '../../hooks/useSchedule'
 import { useConfirm } from '../common/ConfirmProvider'
+import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 import { EmployeeCombobox } from './EmployeeCombobox'
 
@@ -58,6 +59,10 @@ export function SlotCell({
       ? '—'
       : 'חור ריק — מ"מ'
 
+  // slot.employee הוא Pick מצומצם (id+full_name בלבד, ראו TemplateSlotWithEmployee) — לכרטיס
+  // הריחוף (טלפון/מייל/סטטוס) צריך את הרשומה המלאה מתוך רשימת employees שכבר נטענת לקומבובוקס
+  const fullEmployee = slot.employee ? employees.find((e) => e.id === slot.employee!.id) : undefined
+
   const cellClass = slot.employee
     ? isTeacher
       ? 'bg-[#dbeafe] text-[#1d4ed8]'
@@ -78,7 +83,7 @@ export function SlotCell({
         onClick={() => setOpen((o) => !o)}
         className={`w-full rounded-md border-r-4 border-current px-2 py-1.5 text-right text-[12.5px] transition-opacity hover:opacity-80 ${cellClass}`}
       >
-        {displayLabel}
+        {slot.employee ? <EmployeeHoverCard employee={fullEmployee}>{displayLabel}</EmployeeHoverCard> : displayLabel}
         {slot.notes && (
           <div className="mt-0.5 break-words text-[10.5px] font-normal opacity-70">
             {slot.notes}

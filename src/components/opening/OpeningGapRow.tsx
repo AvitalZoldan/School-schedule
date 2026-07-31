@@ -4,6 +4,7 @@ import type { OpeningGap } from '../../lib/resolveDashboard'
 import { DAY_PART_LABELS } from '../../types/schedule'
 import type { SlotOccupancy } from '../../types/dashboard'
 import { useConfirm } from '../common/ConfirmProvider'
+import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { SubstituteCombobox } from '../dashboard/SubstituteCombobox'
 
 interface Props {
@@ -26,10 +27,9 @@ export function OpeningGapRow({ gap, morningStaff, employeesById, getOccupancy, 
   const clearOpening = useClearDailyOpening()
   const confirm = useConfirm()
 
+  const absentEmployee = gap.absentEmployeeId != null ? employeesById.get(gap.absentEmployeeId) : null
   const absentName =
-    gap.absentEmployeeId != null
-      ? (employeesById.get(gap.absentEmployeeId)?.full_name ?? `עובדת #${gap.absentEmployeeId}`)
-      : null
+    gap.absentEmployeeId != null ? (absentEmployee?.full_name ?? `עובדת #${gap.absentEmployeeId}`) : null
   const availableStaff = morningStaff.filter((e) => e.id !== gap.absentEmployeeId)
 
   async function handleSelect(employeeId: number) {
@@ -46,13 +46,24 @@ export function OpeningGapRow({ gap, morningStaff, employeesById, getOccupancy, 
     <div className="flex items-center gap-2.5 rounded-md border border-line bg-white px-2.5 py-1.5">
       <div className="min-w-0 flex-1 truncate text-[12.5px]">
         <span className="font-semibold">{gap.roleName}</span>
-        <span className="text-ink-soft"> · {absentName ? `${absentName} נעדרת` : 'לא משובצת'}</span>
+        <span className="text-ink-soft">
+          {' · '}
+          {absentName ? (
+            <>
+              <EmployeeHoverCard employee={absentEmployee}>{absentName}</EmployeeHoverCard> נעדרת
+            </>
+          ) : (
+            'לא משובצת'
+          )}
+        </span>
       </div>
       <div className="w-44 shrink-0">
         {gap.dailyAssignment ? (
           <div className="flex items-center gap-1 rounded border-r-[3px] border-current bg-ok-soft px-1.5 py-1 text-[11.5px] text-ok">
             <span className="flex-1 truncate">
-              {employeesById.get(gap.dailyAssignment.employee_id)?.full_name ?? '—'}
+              <EmployeeHoverCard employee={employeesById.get(gap.dailyAssignment.employee_id)}>
+                {employeesById.get(gap.dailyAssignment.employee_id)?.full_name ?? '—'}
+              </EmployeeHoverCard>
             </span>
             <button
               type="button"

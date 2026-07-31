@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import {
   useEmployeesOverview,
@@ -45,6 +46,8 @@ export default function Employees() {
   const [form, setForm] = useState<EmployeeFormInput>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [leaveModalEmployee, setLeaveModalEmployee] = useState<EmployeeWithType | null>(null)
+  const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // עבור כל עובדת קבועה, החופשה הפעילה/עתידית האחרונה שלה (אם יש) — לכפתור "ניהול/הוספת חופשה" (3.7)
   const currentLeaveByEmployeeId = useMemo(() => {
@@ -58,11 +61,23 @@ export default function Employees() {
     return map
   }, [leaves])
 
-  const visibleEmployees = useMemo(
-    () => (employees ?? []).filter((e) => e.active || showInactive),
-    [employees, showInactive],
-  )
+  const visibleEmployees = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return (employees ?? []).filter(
+      (e) => (e.active || showInactive) && (!query || e.full_name.toLowerCase().includes(query)),
+    )
+  }, [employees, showInactive, search])
   const inactiveCount = (employees ?? []).filter((e) => !e.active).length
+
+  // הגעה ממקום אחר באפליקציה דרך EmployeeHoverCard ("מעבר לפרטי עובדת") — /staff?search=<שם>.
+  // מזריקה את השם לשדה החיפוש כאן, כדי שהטבלה תסונן ישירות לשורה שלה. מנקה את פרמטר ה-query
+  // אחרי שימוש כדי שלא יידרס חיפוש ידני אם המשתמשת פשוט מרעננת/חוזרת לעמוד.
+  useEffect(() => {
+    const target = searchParams.get('search')
+    if (!target) return
+    setSearch(target)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
 
   function openCreateModal() {
     setModal({ kind: 'create' })
@@ -165,8 +180,15 @@ export default function Employees() {
         )}
       </div>
 
-      {inactiveCount > 0 && (
-        <div className="mb-4 flex justify-end print:hidden">
+      <div className="mb-4 flex items-center justify-between gap-2 print:hidden">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="חיפוש לפי שם…"
+          className="w-56 rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
+        />
+        {inactiveCount > 0 && (
           <label className="flex items-center gap-1.5 text-[12px] text-ink-soft">
             <input
               type="checkbox"
@@ -175,8 +197,8 @@ export default function Employees() {
             />
             הצגת לא-פעילות ({inactiveCount})
           </label>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-panel">
         <table className="w-full border-collapse text-[13px]">
@@ -261,7 +283,7 @@ export default function Employees() {
             ) : (
               <tr>
                 <td colSpan={7} className="px-3 py-4 text-center text-ink-soft">
-                  אין עדיין עובדות מוגדרות.
+                  {search.trim() ? 'אין עובדת התואמת את החיפוש.' : 'אין עדיין עובדות מוגדרות.'}
                 </td>
               </tr>
             )}

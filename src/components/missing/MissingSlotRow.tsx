@@ -4,6 +4,7 @@ import type { SlotDayStatus, SlotOccupancy } from '../../types/dashboard'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useAssignDailySlot, useClearDailyAssignment, useMarkAbsence } from '../../hooks/useDashboard'
 import { useConfirm } from '../common/ConfirmProvider'
+import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { SubstituteCombobox } from '../dashboard/SubstituteCombobox'
 
 interface Props {
@@ -86,7 +87,11 @@ export function MissingSlotRow({
       <SubstituteCombobox employees={availableSubs} onSelect={(employeeId) => handleSelect(employeeId)} />
     ) : (
       <div className="flex items-center gap-1 rounded border-r-[3px] border-current bg-ok-soft px-1.5 py-1 text-[11.5px] text-ok">
-        <span className="flex-1 truncate">{employeesById.get(status.employeeId)?.full_name ?? '—'}</span>
+        <span className="flex-1 truncate">
+          <EmployeeHoverCard employee={employeesById.get(status.employeeId)}>
+            {employeesById.get(status.employeeId)?.full_name ?? '—'}
+          </EmployeeHoverCard>
+        </span>
         <button
           type="button"
           onClick={() => clearAssignment.mutate({ schoolId, assignmentId: status.assignmentId })}

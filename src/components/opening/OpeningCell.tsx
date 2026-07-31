@@ -3,6 +3,7 @@ import type { OpeningAssignmentRow, OpeningRoleWithAssignments } from '../../typ
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useUpsertOpeningAssignment, type CampOpeningContext } from '../../hooks/useOpeningRoster'
 import { useConfirm } from '../common/ConfirmProvider'
+import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 
 interface Props {
@@ -62,7 +63,7 @@ export function OpeningCell({
           isFilled ? 'bg-accent-soft text-accent' : 'bg-danger-soft font-semibold text-danger'
         }`}
       >
-        {employee ? employee.full_name : 'לא מאויש'}
+        {employee ? <EmployeeHoverCard employee={employee}>{employee.full_name}</EmployeeHoverCard> : 'לא מאויש'}
         {assignment?.notes && (
           <div className="mt-0.5 break-words text-[10.5px] font-normal opacity-70">
             {assignment.notes}

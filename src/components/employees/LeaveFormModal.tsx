@@ -16,6 +16,7 @@ import { datesInRange, parseISODate, systemWeekday, toGregorianDateLabel, toISOD
 import { DAY_PART_LABELS, WEEKDAY_LABELS, type DayPart } from '../../types/schedule'
 import { SubstituteCombobox } from '../dashboard/SubstituteCombobox'
 import { useConfirm } from '../common/ConfirmProvider'
+import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 
 const REMINDER_PRESETS = [3, 7, 14]
@@ -351,7 +352,11 @@ export function LeaveFormModal({ schoolId, employee, existingLeave, createdBy, o
                                 <div className="w-44 shrink-0">
                                   {assignedEmployee ? (
                                     <div className="flex items-center justify-between gap-1 rounded border border-line bg-white px-1.5 py-1">
-                                      <span className="truncate text-[12px]">{assignedEmployee.full_name}</span>
+                                      <span className="truncate text-[12px]">
+                                        <EmployeeHoverCard employee={assignedEmployee}>
+                                          {assignedEmployee.full_name}
+                                        </EmployeeHoverCard>
+                                      </span>
                                       <button
                                         type="button"
                                         onClick={() => clearSlotAssignment(group.date, row.slotId)}

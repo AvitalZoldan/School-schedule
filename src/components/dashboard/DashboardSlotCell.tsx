@@ -5,6 +5,7 @@ import type { SlotDayStatus, SlotOccupancy } from '../../types/dashboard'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
 import { useAssignDailySlot, useClearDailyAssignment, useMarkAbsence } from '../../hooks/useDashboard'
 import { useConfirm } from '../common/ConfirmProvider'
+import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 import { SubstituteCombobox } from './SubstituteCombobox'
 
@@ -114,12 +115,11 @@ export function DashboardSlotCell({
         ? 'bg-ok-soft text-ok'
         : 'bg-danger-soft text-danger'
 
-  const label =
-    status.kind === 'filled_permanent'
-      ? (employeesById.get(status.employeeId)?.full_name ?? '—')
-      : status.kind === 'filled_sub' || status.kind === 'filled_leave_sub'
-        ? (employeesById.get(status.employeeId)?.full_name ?? '—')
-        : 'חור ריק'
+  const labelEmployee =
+    status.kind === 'filled_permanent' || status.kind === 'filled_sub' || status.kind === 'filled_leave_sub'
+      ? employeesById.get(status.employeeId)
+      : undefined
+  const label = labelEmployee?.full_name ?? (status.kind === 'missing' ? 'חור ריק' : '—')
 
   return (
     <td className={`relative ${topBorderClass} px-0.5 py-1.5 align-top`}>
@@ -134,7 +134,9 @@ export function DashboardSlotCell({
         onClick={() => setOpen((o) => !o)}
         className={`w-full overflow-hidden rounded-md border-r-[3px] border-current px-1 py-1 text-right text-[10px] transition-opacity hover:opacity-80 ${cellClass}`}
       >
-        <div className="truncate">{label}</div>
+        <div className="truncate">
+          {labelEmployee ? <EmployeeHoverCard employee={labelEmployee}>{label}</EmployeeHoverCard> : label}
+        </div>
         {status.kind === 'filled_sub' && (
           <div className="truncate text-[9px] font-normal opacity-70">מ"מ</div>
         )}
