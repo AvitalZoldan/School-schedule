@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import type { EmployeeRow, EmployeeStatus, EmployeeTypeRow } from '../types/schedule'
+import type { EmployeeCategoryRow, EmployeeRow, EmployeeStatus, EmployeeTypeRow } from '../types/schedule'
+
+const EMPLOYEE_SELECT = '*, employee_type:employee_types(id, code, label), category:employee_categories(id, name, color)'
 
 export interface EmployeeWithType extends EmployeeRow {
   employee_type: Pick<EmployeeTypeRow, 'id' | 'code' | 'label'> | null
+  category: Pick<EmployeeCategoryRow, 'id' | 'name' | 'color'> | null
 }
 
 // עובדות פעילות בלבד — לשימוש ברשימות בחירה (SlotCell, שיבוץ יומי וכו')
@@ -14,7 +17,7 @@ export function useEmployees(schoolId: number | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select('*, employee_type:employee_types(id, code, label)')
+        .select(EMPLOYEE_SELECT)
         .eq('school_id', schoolId!)
         .eq('active', true)
         .order('full_name', { ascending: true })
@@ -32,7 +35,7 @@ export function useEmployeesOverview(schoolId: number | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select('*, employee_type:employee_types(id, code, label)')
+        .select(EMPLOYEE_SELECT)
         .eq('school_id', schoolId!)
         .order('full_name', { ascending: true })
       if (error) throw error
@@ -67,6 +70,7 @@ export interface EmployeeFormInput {
   status: EmployeeStatus
   is_preferred: boolean
   notes: string | null
+  category_id: number | null
 }
 
 interface CreateEmployeeInput extends EmployeeFormInput {

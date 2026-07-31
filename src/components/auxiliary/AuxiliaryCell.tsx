@@ -1,40 +1,46 @@
 import { useState } from 'react'
-import type { OpeningAssignmentRow, OpeningRoleWithAssignments } from '../../types/opening'
+import type { AuxiliaryAssignmentRow, AuxiliaryRoleWithAssignments } from '../../types/auxiliary'
 import type { EmployeeWithType } from '../../hooks/useEmployees'
-import { useUpsertOpeningAssignment, type CampOpeningContext } from '../../hooks/useOpeningRoster'
+import { useUpsertAuxiliaryAssignment, type CampAuxiliaryContext } from '../../hooks/useAuxiliarySystems'
 import { useConfirm } from '../common/ConfirmProvider'
 import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 
 interface Props {
   schoolId: number
+  systemName: string
   roleId: number
   weekday: number
-  assignment: OpeningAssignmentRow | undefined
-  // רק העובדות שמשובצות לחור בוקר כלשהו ביום הזה — לא כל הרשימה הכללית
+  assignment: AuxiliaryAssignmentRow | undefined
+  // רק העובדות שמשובצות לחור כלשהו ביום הזה, בחלק-היום שהוגדר כמקור הצוות למערכת (source_day_part) — לא כל הרשימה הכללית. משמש רק לאפשרויות הבחירה בתפריט.
   availableEmployees: EmployeeWithType[]
-  // כל תפקידי הפתיחה עם השיבוצים שלהם (אותו הקשר: רגיל, או אותה קייטנה+שבוע) — לבדיקה
-  // שאותה עובדת לא משובצת כבר לתפקיד פתיחה אחר באותו יום (פתיחה היא "פעם אחת ביום")
-  roster: OpeningRoleWithAssignments[]
-  campContext?: CampOpeningContext
+  // כל העובדות (בלי הגבלת מועמדות) — לפתרון שם התצוגה של עובדת שכבר משובצת, גם אם היא לא (יותר)
+  // ברשימת המועמדות המוגבלת (למשל שינוי במקור הצוות של המערכת אחרי שהשיבוץ נשמר)
+  employeesById: Map<number, EmployeeWithType>
+  // כל תפקידי אותה מערכת עזר עם השיבוצים שלהם (אותו הקשר: רגיל, או אותה קייטנה+שבוע) — לבדיקה
+  // שאותה עובדת לא משובצת כבר לתפקיד אחר באותה מערכת באותו יום (תפקיד עזר הוא "פעם אחת ביום")
+  roster: AuxiliaryRoleWithAssignments[]
+  campContext?: CampAuxiliaryContext
 }
 
-export function OpeningCell({
+export function AuxiliaryCell({
   schoolId,
+  systemName,
   roleId,
   weekday,
   assignment,
   availableEmployees,
+  employeesById,
   roster,
   campContext,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [notesDraft, setNotesDraft] = useState(assignment?.notes ?? '')
-  const upsert = useUpsertOpeningAssignment()
+  const upsert = useUpsertAuxiliaryAssignment()
   const confirm = useConfirm()
 
   const employeeId = assignment?.employee_id ?? null
-  const employee = availableEmployees.find((e) => e.id === employeeId)
+  const employee = employeeId != null ? employeesById.get(employeeId) : undefined
   const isFilled = !!employeeId
 
   function openPopover() {
@@ -63,7 +69,13 @@ export function OpeningCell({
           isFilled ? 'bg-accent-soft text-accent' : 'bg-danger-soft font-semibold text-danger'
         }`}
       >
-        {employee ? <EmployeeHoverCard employee={employee}>{employee.full_name}</EmployeeHoverCard> : 'לא מאויש'}
+        {employee ? (
+          <EmployeeHoverCard employee={employee}>{employee.full_name}</EmployeeHoverCard>
+        ) : isFilled ? (
+          `עובדת #${employeeId}`
+        ) : (
+          'לא מאויש'
+        )}
         {assignment?.notes && (
           <div className="mt-0.5 break-words text-[10.5px] font-normal opacity-70">
             {assignment.notes}
@@ -75,7 +87,7 @@ export function OpeningCell({
         <div className="absolute z-20 mt-1.5 flex w-56 flex-col gap-1.5 rounded-md border border-line bg-panel p-2 shadow-md">
           {availableEmployees.length === 0 ? (
             <div className="px-1 py-1 text-[11.5px] text-ink-soft">
-              אין עובדות המשובצות לבוקר ביום זה בשיבוץ הבסיסי.
+              אין עובדות המשובצות ביום זה בשיבוץ הבסיסי.
             </div>
           ) : (
             <select
@@ -91,7 +103,10 @@ export function OpeningCell({
                   if (conflictRole) {
                     const employeeName =
                       availableEmployees.find((emp) => emp.id === newEmployeeId)?.full_name ?? 'העובדת'
-                    const message = buildTransferConfirmMessage(employeeName, `ביום זה לתפקיד פתיחה "${conflictRole.name}"`)
+                    const message = buildTransferConfirmMessage(
+                      employeeName,
+                      `ביום זה לתפקיד "${conflictRole.name}" (${systemName})`,
+                    )
                     if (!(await confirm(message))) return
                     const conflictAssignment = conflictRole.assignments[weekday]
                     if (conflictAssignment) {

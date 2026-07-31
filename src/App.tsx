@@ -12,7 +12,7 @@ import EmployeeReport from './pages/EmployeeReport'
 import Camps from './pages/Camps'
 import CampDetail from './pages/CampDetail'
 import Draft from './pages/Draft'
-import Opening from './pages/Opening'
+import AuxiliarySystems from './pages/AuxiliarySystems'
 import History from './pages/History'
 import SubstituteList from './pages/SubstituteList'
 import Classes from './pages/Classes'
@@ -40,7 +40,7 @@ export default function App() {
         <Route path="camps" element={<Camps />} />
         <Route path="camps/:campId" element={<CampDetail />} />
         <Route path="draft" element={<Draft />} />
-        <Route path="opening" element={<Opening />} />
+        <Route path="opening" element={<AuxiliarySystems />} />
         <Route path="history" element={<History />} />
         <Route path="substitutes" element={<SubstituteList />} />
         <Route path="staff" element={<Employees />} />

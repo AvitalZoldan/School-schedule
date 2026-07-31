@@ -6,7 +6,7 @@ export const NAV_ITEMS = [
   { to: '/employee', label: 'דוח לעובדת' },
   { to: '/camps', label: 'ניהול קייטנות' },
   { to: '/draft', label: 'טיוטת שיבוץ' },
-  { to: '/opening', label: 'מערכת פתיחות' },
+  { to: '/opening', label: 'מערכות עזר' },
   { to: '/history', label: 'היסטוריה' },
 ] as const
 

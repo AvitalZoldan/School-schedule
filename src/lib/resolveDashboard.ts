@@ -7,7 +7,9 @@ import type {
   SlotDayStatus,
   SlotOccupancy,
 } from '../types/dashboard'
-import type { DailyOpeningAssignmentRow, OpeningRoleWithAssignments } from '../types/opening'
+import type { AuxiliarySystemWithRoster } from '../hooks/useAuxiliarySystems'
+import type { DailyAuxiliaryAssignmentRow, StaffSourceMode } from '../types/auxiliary'
+import type { EmployeeWithType } from '../hooks/useEmployees'
 import { parseISODate, systemWeekday } from './dateUtils'
 
 // "הקשר פתרון" — מבני עזר (Map/Set) בנויים פעם אחת מהנתונים שנשלפו לטווח הנבחר,
@@ -134,14 +136,16 @@ export function occupancyKey(date: string, dayPart: DayPart, employeeId: number)
   return `${date}:${dayPart}:${employeeId}`
 }
 
-// מי בפועל נמצאת בבניין בבוקר של תאריך קונקרטי (בכל כיתה שהיא) — אחרי פתרון היעדרויות/חופשות/
-// מ"מ יומיים לאותו תאריך ספציפי. שונה מ-useMorningStaffByWeekday (המשמש את מסך "מערכת פתיחות"),
+// מי בפועל נמצאת בבניין בחלק-יום נתון (בכל כיתה שהיא) בתאריך קונקרטי — אחרי פתרון היעדרויות/
+// חופשות/מ"מ יומיים לאותו תאריך ספציפי. שונה מ-useStaffByWeekday (המשמש את מסך "מערכות עזר"),
 // שמבוסס רק על השיבוץ השבועי הסטטי ולכן עלול לכלול מי שהיום הזה עצמה נעדרת/הועברה לכיסוי אחר.
-// משמש לרשימת המועמדות למ"מ פתיחה חד-פעמי (5.7-ג המורחב).
-export function computeMorningPresenceByDate(
+// משמש לרשימת המועמדות למ"מ חד-פעמי במערכת עזר (5.7-ג המורחב) — dayPart נקבע לפי
+// AuxiliarySystemRow.source_day_part של אותה מערכת.
+export function computePresenceByDate(
   classes: { slots: TemplateSlotWithEmployee[] }[],
   dates: string[],
   ctx: ResolveContext,
+  dayPart: DayPart,
 ): Map<string, Set<number>> {
   const map = new Map<string, Set<number>>()
   for (const date of dates) {
@@ -149,7 +153,7 @@ export function computeMorningPresenceByDate(
     const present = new Set<number>()
     for (const classData of classes) {
       for (const slot of classData.slots) {
-        if (slot.weekday !== weekday || slot.day_part !== 'morning') continue
+        if (slot.weekday !== weekday || slot.day_part !== dayPart) continue
         const status = resolveSlotStatus(slot, date, ctx)
         if (
           status.kind === 'filled_permanent' ||
@@ -165,44 +169,90 @@ export function computeMorningPresenceByDate(
   return map
 }
 
-// "חור פתיחה" לתאריך קונקרטי: תפקיד פתיחה שאין לו כיסוי בפועל באותו יום — או כי הוא לא מאויש
-// בכלל בשיבוץ השבועי (absentEmployeeId: null), או כי הוא כן מאויש אבל העובדת המשובצת נעדרת/
-// בחופשה באותו תאריך בלבד. מטופל כחור אחיד (5.7-ג המורחב) — בשני המקרים אפשר לשבץ מ"מ ישירות
-// דרך daily_opening_assignments, בלי לגעת בשיבוץ השבועי הקבוע במסך "מערכת פתיחות".
-export interface OpeningGap {
+// כל העובדות הפעילות שאינן נעדרות/בחופשה בתאריך קונקרטי — מקביל ל-computePresenceByDate אבל
+// למקור צוות "all" (כל העובדות, בלי הגבלה לפי שיבוץ קיים בזמן מסוים).
+export function computeAllActivePresenceByDate(
+  employees: EmployeeWithType[],
+  dates: string[],
+  ctx: ResolveContext,
+): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>()
+  for (const date of dates) {
+    const present = new Set<number>()
+    for (const emp of employees) {
+      if (emp.active && !isEmployeeUnavailable(ctx, emp.id, date)) present.add(emp.id)
+    }
+    map.set(date, present)
+  }
+  return map
+}
+
+// תפוסה קיימת (למחסום/אישור-העברה) עבור מועמדת לחור במערכת עזר, לפי מקור הצוות של המערכת:
+// חלק-יום ספציפי בודק רק שם; "all" בודק גם בוקר וגם צהריים (איחוד), כי אין חלק-יום יחיד רלוונטי.
+export function auxiliaryOccupancy(
+  occupancyMap: Map<string, SlotOccupancy>,
+  date: string,
+  sourceDayPart: StaffSourceMode,
+  employeeId: number,
+): SlotOccupancy | null {
+  if (sourceDayPart === 'all') {
+    return (
+      occupancyMap.get(occupancyKey(date, 'morning', employeeId)) ??
+      occupancyMap.get(occupancyKey(date, 'afternoon', employeeId)) ??
+      null
+    )
+  }
+  return occupancyMap.get(occupancyKey(date, sourceDayPart, employeeId)) ?? null
+}
+
+// "חור" במערכת עזר (פתיחה/סגירה/וכל מה שבית הספר יגדיר) לתאריך קונקרטי: תפקיד שאין לו כיסוי
+// בפועל באותו יום — או כי הוא לא מאויש בכלל בשיבוץ השבועי (absentEmployeeId: null), או כי הוא
+// כן מאויש אבל העובדת המשובצת נעדרת/בחופשה באותו תאריך בלבד. מטופל כחור אחיד (5.7-ג המורחב) —
+// בשני המקרים אפשר לשבץ מ"מ ישירות דרך daily_auxiliary_assignments, בלי לגעת בשיבוץ השבועי
+// הקבוע במסך "מערכות עזר". מחושב רק עבור מערכות עם show_in_missing=true.
+export interface AuxiliaryGap {
   date: string
   weekday: number
+  systemId: number
+  systemName: string
+  sourceDayPart: StaffSourceMode
   roleId: number
   roleName: string
   absentEmployeeId: number | null
-  dailyAssignment?: DailyOpeningAssignmentRow
+  dailyAssignment?: DailyAuxiliaryAssignmentRow
 }
 
-export function computeOpeningGaps(
-  openingRoles: OpeningRoleWithAssignments[],
+export function computeAuxiliaryGaps(
+  systemsWithRoster: AuxiliarySystemWithRoster[],
   dates: string[],
   ctx: ResolveContext,
-  dailyOpeningAssignments: DailyOpeningAssignmentRow[],
-): OpeningGap[] {
-  const byRoleDate = new Map<string, DailyOpeningAssignmentRow>()
-  for (const a of dailyOpeningAssignments) byRoleDate.set(`${a.role_id}:${a.opening_date}`, a)
+  dailyAssignments: DailyAuxiliaryAssignmentRow[],
+): AuxiliaryGap[] {
+  const byRoleDate = new Map<string, DailyAuxiliaryAssignmentRow>()
+  for (const a of dailyAssignments) byRoleDate.set(`${a.role_id}:${a.assignment_date}`, a)
 
-  const result: OpeningGap[] = []
+  const result: AuxiliaryGap[] = []
   for (const date of dates) {
     const weekday = systemWeekday(parseISODate(date))
-    if (weekday === 7) continue // שבת — מסך "מערכת פתיחות" מנהל רק ימים 1-6, אין שם מה לאייש
-    for (const role of openingRoles) {
-      const assignedId = role.assignments[weekday]?.employee_id ?? null
-      const isGap = assignedId === null || isEmployeeUnavailable(ctx, assignedId, date)
-      if (!isGap) continue
-      result.push({
-        date,
-        weekday,
-        roleId: role.id,
-        roleName: role.name,
-        absentEmployeeId: assignedId,
-        dailyAssignment: byRoleDate.get(`${role.id}:${date}`),
-      })
+    if (weekday === 7) continue // שבת — מסך "מערכות עזר" מנהל רק ימים 1-6, אין שם מה לאייש
+    for (const { system, roles } of systemsWithRoster) {
+      if (!system.show_in_missing) continue
+      for (const role of roles) {
+        const assignedId = role.assignments[weekday]?.employee_id ?? null
+        const isGap = assignedId === null || isEmployeeUnavailable(ctx, assignedId, date)
+        if (!isGap) continue
+        result.push({
+          date,
+          weekday,
+          systemId: system.id,
+          systemName: system.name,
+          sourceDayPart: system.source_day_part,
+          roleId: role.id,
+          roleName: role.name,
+          absentEmployeeId: assignedId,
+          dailyAssignment: byRoleDate.get(`${role.id}:${date}`),
+        })
+      }
     }
   }
   return result

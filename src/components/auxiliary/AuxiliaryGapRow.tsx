@@ -1,6 +1,6 @@
 import type { EmployeeWithType } from '../../hooks/useEmployees'
-import { useAssignDailyOpening, useClearDailyOpening } from '../../hooks/useOpeningRoster'
-import type { OpeningGap } from '../../lib/resolveDashboard'
+import { useAssignDailyAuxiliary, useClearDailyAuxiliary } from '../../hooks/useAuxiliarySystems'
+import type { AuxiliaryGap } from '../../lib/resolveDashboard'
 import { DAY_PART_LABELS } from '../../types/schedule'
 import type { SlotOccupancy } from '../../types/dashboard'
 import { useConfirm } from '../common/ConfirmProvider'
@@ -8,44 +8,47 @@ import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
 import { SubstituteCombobox } from '../dashboard/SubstituteCombobox'
 
 interface Props {
-  gap: OpeningGap
-  morningStaff: EmployeeWithType[]
+  gap: AuxiliaryGap
+  availableStaff: EmployeeWithType[]
   employeesById: Map<number, EmployeeWithType>
   getOccupancy: (employeeId: number) => SlotOccupancy | null
   schoolId: number
   createdBy: string | null
 }
 
-// שורת "חור פתיחה" בודדת (5.7-ג המורחב): תפקיד פתיחה שהתפנה לתאריך ספציפי כי העובדת הקבועה
-// נעדרת/בחופשה אותו יום בלבד — לא נוגע בשיבוץ השבועי הקבוע (מסך "מערכת פתיחות"). רשימת
-// הבחירה זהה לזו שבמסך "מערכת פתיחות": כל מי שמשובצת לחור בוקר כלשהו באותו יום בשבוע — ולכן
-// כל מועמדת כאן כבר משובצת בכיתה כלשהי אותו בוקר (בניגוד לחור בכיתה, כאן זה שיבוץ נוסף ולא
-// העברה: היא ממשיכה גם בתפקידה הרגיל). מבקשים אישור לפני שיבוץ, בדיוק כמו בדשבורד, כדי
-// שהאחראית תדע במפורש שהעובדת כבר עסוקה במקום אחר אותו בוקר.
-export function OpeningGapRow({ gap, morningStaff, employeesById, getOccupancy, schoolId, createdBy }: Props) {
-  const assignOpening = useAssignDailyOpening()
-  const clearOpening = useClearDailyOpening()
+// שורת "חור" בודדת במערכת עזר כלשהי (5.7-ג המורחב): תפקיד שהתפנה לתאריך ספציפי כי העובדת
+// הקבועה נעדרת/בחופשה אותו יום בלבד, או שמעולם לא שובץ שם — לא נוגע בשיבוץ השבועי הקבוע
+// (מסך "מערכות עזר"). רשימת הבחירה זהה לזו שבמסך "מערכות עזר": כל מי שמשובצת לחור כלשהו באותו
+// יום בשבוע, בחלק-היום שהוגדר כמקור הצוות לאותה מערכת — ולכן כל מועמדת כאן כבר משובצת בכיתה
+// כלשהי אותו יום (בניגוד לחור בכיתה, כאן זה שיבוץ נוסף ולא העברה: היא ממשיכה גם בתפקידה
+// הרגיל). מבקשים אישור לפני שיבוץ, בדיוק כמו בדשבורד, כדי שהאחראית תדע במפורש שהעובדת כבר
+// עסוקה במקום אחר אותו יום.
+export function AuxiliaryGapRow({ gap, availableStaff, employeesById, getOccupancy, schoolId, createdBy }: Props) {
+  const assignAuxiliary = useAssignDailyAuxiliary()
+  const clearAuxiliary = useClearDailyAuxiliary()
   const confirm = useConfirm()
 
   const absentEmployee = gap.absentEmployeeId != null ? employeesById.get(gap.absentEmployeeId) : null
   const absentName =
     gap.absentEmployeeId != null ? (absentEmployee?.full_name ?? `עובדת #${gap.absentEmployeeId}`) : null
-  const availableStaff = morningStaff.filter((e) => e.id !== gap.absentEmployeeId)
+  const candidates = availableStaff.filter((e) => e.id !== gap.absentEmployeeId)
 
   async function handleSelect(employeeId: number) {
     const occupancy = getOccupancy(employeeId)
     if (occupancy) {
       const employeeName = employeesById.get(employeeId)?.full_name ?? ''
-      const message = `${employeeName} כבר משובצת ב${occupancy.className}, ${DAY_PART_LABELS[occupancy.dayPart]} - ${occupancy.role}. לשבץ אותה גם לתפקיד פתיחה זה?`
+      const message = `${employeeName} כבר משובצת ב${occupancy.className}, ${DAY_PART_LABELS[occupancy.dayPart]} - ${occupancy.role}. לשבץ אותה גם לתפקיד "${gap.roleName}" (${gap.systemName})?`
       if (!(await confirm(message))) return
     }
-    assignOpening.mutate({ schoolId, roleId: gap.roleId, date: gap.date, employeeId, createdBy })
+    assignAuxiliary.mutate({ schoolId, roleId: gap.roleId, date: gap.date, employeeId, createdBy })
   }
 
   return (
     <div className="flex items-center gap-2.5 rounded-md border border-line bg-white px-2.5 py-1.5">
       <div className="min-w-0 flex-1 truncate text-[12.5px]">
-        <span className="font-semibold">{gap.roleName}</span>
+        <span className="font-semibold">
+          {gap.systemName} · {gap.roleName}
+        </span>
         <span className="text-ink-soft">
           {' · '}
           {absentName ? (
@@ -67,7 +70,7 @@ export function OpeningGapRow({ gap, morningStaff, employeesById, getOccupancy, 
             </span>
             <button
               type="button"
-              onClick={() => clearOpening.mutate({ schoolId, assignmentId: gap.dailyAssignment!.id })}
+              onClick={() => clearAuxiliary.mutate({ schoolId, assignmentId: gap.dailyAssignment!.id })}
               aria-label="בטל שיבוץ"
               className="shrink-0 rounded px-1 text-[13px] leading-none hover:opacity-60"
             >
@@ -75,7 +78,7 @@ export function OpeningGapRow({ gap, morningStaff, employeesById, getOccupancy, 
             </button>
           </div>
         ) : (
-          <SubstituteCombobox employees={availableStaff} getOccupancy={getOccupancy} onSelect={handleSelect} />
+          <SubstituteCombobox employees={candidates} getOccupancy={getOccupancy} onSelect={handleSelect} />
         )}
       </div>
     </div>

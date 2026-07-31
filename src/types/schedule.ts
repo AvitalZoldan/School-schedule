@@ -29,6 +29,7 @@ export interface EmployeeRow {
   is_preferred: boolean // מועדפת (רלוונטי למ"מ)
   notes: string | null
   active: boolean
+  category_id: number | null
 }
 
 export interface EmployeeTypeRow {
@@ -36,6 +37,16 @@ export interface EmployeeTypeRow {
   school_id: number
   code: string
   label: string
+  sort_order: number
+  active: boolean
+}
+
+// קטגוריית עובדות מוגדרת-בית-ספר (עם צבע לתצוגה) — נערכת במסך "ניהול"
+export interface EmployeeCategoryRow {
+  id: number
+  school_id: number
+  name: string
+  color: string
   sort_order: number
   active: boolean
 }

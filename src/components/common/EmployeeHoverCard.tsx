@@ -17,7 +17,7 @@ interface Props {
 // יושבים בתוך div עם overflow-hidden (truncate), שהיה חותך כל פופ-אובר absolute רגיל.
 //
 // הטריגר הפנימי ("מעבר לפרטי עובדת") הוא span עם role="button" ולא <button> אמיתי: הרבה מוקדי
-// שימוש (SlotCell/DashboardSlotCell/OpeningCell) כבר מציגים את השם בתוך <button> שפותח פופ-אובר
+// שימוש (SlotCell/DashboardSlotCell/AuxiliaryCell) כבר מציגים את השם בתוך <button> שפותח פופ-אובר
 // שיבוץ — button מקונן בתוך button הוא HTML לא תקין, ולכן משתמשים ב-span+stopPropagation במקום.
 export function EmployeeHoverCard({ employee, children }: Props) {
   const [open, setOpen] = useState(false)

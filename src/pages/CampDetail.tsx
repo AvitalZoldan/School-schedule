@@ -5,7 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useClasses } from '../hooks/useClasses'
 import { useEmployees, type EmployeeWithType } from '../hooks/useEmployees'
 import { useCamp, useCampDashboardData } from '../hooks/useCamps'
-import { useOpeningRoster } from '../hooks/useOpeningRoster'
+import { useAuxiliarySystems, useAuxiliaryRoster } from '../hooks/useAuxiliarySystems'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
 import { buildResolveContext, computeOccupancyMap } from '../lib/resolveDashboard'
 import {
@@ -21,7 +21,7 @@ import { WEEKDAY_LABELS, type DayPart } from '../types/schedule'
 import type { CampPeriodRow } from '../types/camps'
 import type { SlotOccupancy } from '../types/dashboard'
 import { ClassGrid } from '../components/dashboard/ClassGrid'
-import { OpeningCell } from '../components/opening/OpeningCell'
+import { AuxiliaryCell } from '../components/auxiliary/AuxiliaryCell'
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6]
 const SATURDAY_WEEKDAY = 7
@@ -111,14 +111,27 @@ export default function CampDetail() {
 
   const employeesById = useMemo(() => new Map((allEmployees ?? []).map((e) => [e.id, e])), [allEmployees])
 
-  // עובדות המשובצות לחור בוקר כלשהו (בכיתה כלשהי), לפי יום בשבוע — מתוך שיבוץ הקייטנה הפעיל
-  // (לא השנה הרגילה). זו רשימת הבחירה המוגבלת לתפקידי פתיחה בקייטנה, מקביל ל-
-  // useMorningStaffByWeekday של מסך "מערכת פתיחות" הרגיל.
-  const campMorningStaffByWeekday = useMemo(() => {
+  // מערכת העזר המוצגת כסעיף מתקפל בקייטנה — ראשונה (לפי סדר תצוגה) מבין מערכות העזר הפעילות
+  // של בית הספר. אין כאן בחירת מערכת ייעודית לקייטנות (לא נתבקש), רק המשך התנהגות "מערכת
+  // פתיחות" הקודמת שהייתה יחידה — כעת גנרית מבחינת מבנה הנתונים.
+  const { data: auxiliarySystems } = useAuxiliarySystems(schoolId)
+  const campAuxiliarySystem = auxiliarySystems?.[0]
+
+  // עובדות המשובצות לחור כלשהו (בכיתה כלשהי), לפי יום בשבוע ולפי חלק-היום שמוגדר כמקור הצוות
+  // למערכת העזר המוצגת — מתוך שיבוץ הקייטנה הפעיל (לא השנה הרגילה). מקביל ל-useStaffByWeekday
+  // של מסך "מערכות עזר" הרגיל.
+  const campStaffByWeekday = useMemo(() => {
+    const sourceDayPart = campAuxiliarySystem?.source_day_part ?? 'morning'
+    if (sourceDayPart === 'all') {
+      const allActive = (allEmployees ?? []).filter((e) => e.active)
+      const result: Record<number, EmployeeWithType[]> = {}
+      for (const wd of WEEKDAYS) result[wd] = allActive
+      return result
+    }
     const byWeekday = new Map<number, Map<number, EmployeeWithType>>()
     for (const classData of dashboardData?.classes ?? []) {
       for (const slot of classData.slots) {
-        if (slot.day_part !== 'morning' || !slot.assigned_employee_id) continue
+        if (slot.day_part !== sourceDayPart || !slot.assigned_employee_id) continue
         const emp = employeesById.get(slot.assigned_employee_id)
         if (!emp) continue
         if (!byWeekday.has(slot.weekday)) byWeekday.set(slot.weekday, new Map())
@@ -130,7 +143,7 @@ export default function CampDetail() {
       result[wd] = [...empMap.values()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'he'))
     }
     return result
-  }, [dashboardData, employeesById])
+  }, [dashboardData, employeesById, campAuxiliarySystem, allEmployees])
 
   const ctx = useMemo(
     () =>
@@ -157,11 +170,12 @@ export default function CampDetail() {
     [dashboardData, scopeClassId],
   )
 
-  // ---- מערכת פתיחות (מתקפלת) ----
-  const [openingExpanded, setOpeningExpanded] = useState(false)
-  const { data: openingRoster } = useOpeningRoster(
+  // ---- מערכת עזר (מתקפלת) ----
+  const [auxiliaryExpanded, setAuxiliaryExpanded] = useState(false)
+  const { data: auxiliaryRoster } = useAuxiliaryRoster(
     schoolId,
-    campId && openingExpanded ? { campId, weekNumber } : undefined,
+    campAuxiliarySystem?.id,
+    campId && auxiliaryExpanded ? { campId, weekNumber } : undefined,
   )
 
   if (campLoading) {
@@ -274,18 +288,23 @@ export default function CampDetail() {
 
       <details
         className="mt-6 rounded-xl border border-line bg-panel px-3 py-2.5 print:hidden"
-        onToggle={(e) => setOpeningExpanded(e.currentTarget.open)}
+        onToggle={(e) => setAuxiliaryExpanded(e.currentTarget.open)}
       >
         <summary className="cursor-pointer select-none text-[12.5px] font-medium text-ink-soft">
-          מערכת פתיחות לקייטנה
+          {campAuxiliarySystem ? `${campAuxiliarySystem.name} לקייטנה` : 'מערכת עזר לקייטנה'}
         </summary>
 
-        {openingExpanded && (
+        {auxiliaryExpanded && (
           <div className="mt-3">
             <div className="mb-3 text-[12.5px] text-ink-soft">
               שבוע {weekNumber} — לפי הניווט למעלה
             </div>
 
+            {!campAuxiliarySystem ? (
+              <div className="px-3 py-3 text-center text-[12px] text-ink-soft">
+                אין מערכות עזר מוגדרות. אפשר להגדיר במסך "מערכות עזר".
+              </div>
+            ) : (
             <div className="overflow-x-auto rounded-lg border border-line">
               <table className="w-full table-fixed border-collapse text-[13px]">
                 <colgroup>
@@ -305,20 +324,22 @@ export default function CampDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {openingRoster && openingRoster.length > 0 ? (
-                    openingRoster.map((role) => (
+                  {auxiliaryRoster && auxiliaryRoster.length > 0 ? (
+                    auxiliaryRoster.map((role) => (
                       <tr key={role.id}>
                         <td className="border-t border-line px-2 py-2 text-[12.5px] font-medium">{role.name}</td>
                         {WEEKDAYS.map((wd) =>
                           schoolId && campId ? (
-                            <OpeningCell
+                            <AuxiliaryCell
                               key={wd}
                               schoolId={schoolId}
+                              systemName={campAuxiliarySystem.name}
                               roleId={role.id}
                               weekday={wd}
                               assignment={role.assignments[wd]}
-                              availableEmployees={campMorningStaffByWeekday[wd] ?? []}
-                              roster={openingRoster ?? []}
+                              availableEmployees={campStaffByWeekday[wd] ?? []}
+                              employeesById={employeesById}
+                              roster={auxiliaryRoster ?? []}
                               campContext={{ campId, weekNumber }}
                             />
                           ) : (
@@ -330,13 +351,14 @@ export default function CampDetail() {
                   ) : (
                     <tr>
                       <td colSpan={WEEKDAYS.length + 1} className="px-3 py-3 text-center text-[12px] text-ink-soft">
-                        אין תפקידי פתיחה מוגדרים.
+                        אין עדיין תפקידים מוגדרים במערכת זו.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
       </details>

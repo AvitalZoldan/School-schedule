@@ -3,24 +3,27 @@ import { useAuth } from '../lib/AuthContext'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
-import { useDailyOpeningAssignments, useOpeningRoster } from '../hooks/useOpeningRoster'
+import { useDailyAuxiliaryAssignments, useAllAuxiliaryRosters } from '../hooks/useAuxiliarySystems'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
 import { useHolidays } from '../hooks/useHolidays'
 import { addDays, formatDisplayDate, parseISODate, systemWeekday, toISODate, weekDates } from '../lib/dateUtils'
 import {
+  auxiliaryOccupancy,
   buildResolveContext,
-  computeMorningPresenceByDate,
+  computeAllActivePresenceByDate,
+  computeAuxiliaryGaps,
   computeOccupancyMap,
-  computeOpeningGaps,
+  computePresenceByDate,
   occupancyKey,
   resolveSlotStatus,
 } from '../lib/resolveDashboard'
 import { DAY_PART_LABELS, WEEKDAY_LABELS } from '../types/schedule'
 import type { DayPart, TemplateSlotWithEmployee } from '../types/schedule'
+import type { StaffSourceMode } from '../types/auxiliary'
 import type { SlotDayStatus } from '../types/dashboard'
 import { SegmentedToggle } from '../components/common/SegmentedToggle'
 import { MissingSlotRow } from '../components/missing/MissingSlotRow'
-import { OpeningGapRow } from '../components/opening/OpeningGapRow'
+import { AuxiliaryGapRow } from '../components/auxiliary/AuxiliaryGapRow'
 
 type RangeMode = 'day' | 'week'
 type ViewMode = 'byClass' | 'byDayPart'
@@ -50,7 +53,7 @@ export default function SubstituteAssignment() {
   const schoolId = useCurrentSchoolId()
   const { profile } = useAuth()
   const { data: allEmployees } = useEmployees(schoolId)
-  const { data: openingRoles } = useOpeningRoster(schoolId)
+  const { data: auxiliaryRosters } = useAllAuxiliaryRosters(schoolId)
   const { data: schoolSettings } = useSchoolSettings(schoolId)
   const dateDisplayMode = schoolSettings?.date_display ?? 'hebrew'
 
@@ -83,7 +86,7 @@ export default function SubstituteAssignment() {
   const endDate = dates[dates.length - 1]
 
   const { data, isLoading } = useDashboardData(schoolId, startDate, endDate)
-  const { data: dailyOpeningAssignments } = useDailyOpeningAssignments(schoolId, startDate, endDate)
+  const { data: dailyAuxiliaryAssignments } = useDailyAuxiliaryAssignments(schoolId, startDate, endDate)
   const { data: holidays } = useHolidays(schoolId, startDate, endDate)
   const holidaySet = useMemo(() => new Set((holidays ?? []).map((h) => h.holiday_date)), [holidays])
 
@@ -139,19 +142,35 @@ export default function SubstituteAssignment() {
     return result
   }, [data, ctx, dates, holidaySet])
 
-  // "חורי פתיחה" (5.7-ג המורחב): לכל תאריך בטווח, תפקיד פתיחה שאין לו כיסוי בפועל — או כי הוא
-  // לא מאויש בכלל בשיבוץ השבועי, או כי העובדת המשובצת נעדרת/בחופשה אותו יום ספציפי. בשני
-  // המקרים ניתן לשבץ מ"מ ישירות מכאן (daily_opening_assignments), בלי לגעת בשיבוץ השבועי הקבוע.
-  const openingGaps = useMemo(
-    () => (openingRoles && ctx ? computeOpeningGaps(openingRoles, dates, ctx, dailyOpeningAssignments ?? []) : []),
-    [openingRoles, ctx, dates, dailyOpeningAssignments],
+  // "חורי מערכות עזר" (5.7-ג המורחב): לכל תאריך בטווח ולכל מערכת עזר עם show_in_missing, תפקיד
+  // שאין לו כיסוי בפועל — או כי הוא לא מאויש בכלל בשיבוץ השבועי, או כי העובדת המשובצת נעדרת/
+  // בחופשה אותו יום ספציפי. בשני המקרים ניתן לשבץ מ"מ ישירות מכאן, בלי לגעת בשיבוץ השבועי הקבוע.
+  const auxiliaryGaps = useMemo(
+    () =>
+      auxiliaryRosters && ctx
+        ? computeAuxiliaryGaps(auxiliaryRosters, dates, ctx, dailyAuxiliaryAssignments ?? [])
+        : [],
+    [auxiliaryRosters, ctx, dates, dailyAuxiliaryAssignments],
   )
 
-  // מי בפועל בבניין בבוקר כל תאריך (לא השיבוץ השבועי הסטטי) — לרשימת המועמדות למ"מ פתיחה
+  // מי בפועל בבניין בכל תאריך (לא השיבוץ השבועי הסטטי), לפי מקור צוות — לרשימת המועמדות למ"מ
+  // מערכת עזר. מחושב פעם אחת לכל מקור אפשרי (בוקר/צהריים/כל העובדות), לא פר-מערכת.
   const morningPresenceByDate = useMemo(
-    () => (data && ctx ? computeMorningPresenceByDate(data.classes, dates, ctx) : new Map<string, Set<number>>()),
+    () => (data && ctx ? computePresenceByDate(data.classes, dates, ctx, 'morning') : new Map<string, Set<number>>()),
     [data, ctx, dates],
   )
+  const afternoonPresenceByDate = useMemo(
+    () => (data && ctx ? computePresenceByDate(data.classes, dates, ctx, 'afternoon') : new Map<string, Set<number>>()),
+    [data, ctx, dates],
+  )
+  const allActivePresenceByDate = useMemo(
+    () => (ctx ? computeAllActivePresenceByDate(allEmployees ?? [], dates, ctx) : new Map<string, Set<number>>()),
+    [allEmployees, ctx, dates],
+  )
+  function presenceByDate(sourceDayPart: StaffSourceMode) {
+    if (sourceDayPart === 'all') return allActivePresenceByDate
+    return sourceDayPart === 'morning' ? morningPresenceByDate : afternoonPresenceByDate
+  }
 
   const totalOpen = useMemo(
     () => [...itemsByDate.values()].flat().filter((i) => i.status.kind === 'missing').length,
@@ -218,24 +237,24 @@ export default function SubstituteAssignment() {
         <div className="rounded-xl border border-line bg-panel p-[18px] text-ink-soft">טוען…</div>
       ) : (
         <div className="flex flex-col gap-5">
-          {openingGaps.length > 0 && (
+          {auxiliaryGaps.length > 0 && (
             <div className="rounded-xl border border-line bg-panel p-3 print:hidden">
-              <div className="mb-2 text-[13px] font-bold">חורי פתיחה</div>
+              <div className="mb-2 text-[13px] font-bold">חורי מערכות עזר</div>
               <div className="flex flex-col gap-1.5">
-                {openingGaps.map((gap) => (
+                {auxiliaryGaps.map((gap) => (
                   <div key={`${gap.roleId}:${gap.date}`} className="flex items-center gap-2">
                     <div className="w-32 shrink-0 text-[12px] text-ink-soft">
                       {WEEKDAY_LABELS[gap.weekday]} · {formatDisplayDate(parseISODate(gap.date), dateDisplayMode)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <OpeningGapRow
+                      <AuxiliaryGapRow
                         gap={gap}
-                        morningStaff={(allEmployees ?? []).filter((e) =>
-                          morningPresenceByDate.get(gap.date)?.has(e.id),
+                        availableStaff={(allEmployees ?? []).filter((e) =>
+                          presenceByDate(gap.sourceDayPart).get(gap.date)?.has(e.id),
                         )}
                         employeesById={employeesById}
                         getOccupancy={(employeeId) =>
-                          occupancyMap.get(occupancyKey(gap.date, 'morning', employeeId)) ?? null
+                          auxiliaryOccupancy(occupancyMap, gap.date, gap.sourceDayPart, employeeId)
                         }
                         schoolId={schoolId!}
                         createdBy={profile?.id ?? null}

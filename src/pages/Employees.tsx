@@ -9,6 +9,7 @@ import {
   type EmployeeWithType,
   type EmployeeFormInput,
 } from '../hooks/useEmployees'
+import { useEmployeeCategories } from '../hooks/useEmployeeCategories'
 import { useLeaves, useCancelLeave, type LeaveWithEmployee } from '../hooks/useLeaves'
 import { toISODate } from '../lib/dateUtils'
 import { EMPLOYEE_STATUS_LABELS, type EmployeeStatus } from '../types/schedule'
@@ -26,6 +27,7 @@ const emptyForm: EmployeeFormInput = {
   status: 'permanent',
   is_preferred: false,
   notes: '',
+  category_id: null,
 }
 
 export default function Employees() {
@@ -35,6 +37,7 @@ export default function Employees() {
 
   const { data: employees, isLoading } = useEmployeesOverview(schoolId)
   const { data: employeeTypes } = useEmployeeTypes(schoolId)
+  const { data: categories } = useEmployeeCategories(schoolId)
   const { data: leaves } = useLeaves(schoolId)
   const createEmployee = useCreateEmployee()
   const updateEmployee = useUpdateEmployee()
@@ -46,7 +49,9 @@ export default function Employees() {
   const [form, setForm] = useState<EmployeeFormInput>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [leaveModalEmployee, setLeaveModalEmployee] = useState<EmployeeWithType | null>(null)
-  const [search, setSearch] = useState('')
+  const [nameSearch, setNameSearch] = useState('')
+  const [phoneSearch, setPhoneSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<number | 'all'>('all')
   const [searchParams, setSearchParams] = useSearchParams()
 
   // עבור כל עובדת קבועה, החופשה הפעילה/עתידית האחרונה שלה (אם יש) — לכפתור "ניהול/הוספת חופשה" (3.7)
@@ -62,20 +67,25 @@ export default function Employees() {
   }, [leaves])
 
   const visibleEmployees = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const nameQuery = nameSearch.trim().toLowerCase()
+    const phoneQuery = phoneSearch.trim().toLowerCase()
     return (employees ?? []).filter(
-      (e) => (e.active || showInactive) && (!query || e.full_name.toLowerCase().includes(query)),
+      (e) =>
+        (e.active || showInactive) &&
+        (!nameQuery || e.full_name.toLowerCase().includes(nameQuery)) &&
+        (!phoneQuery || (e.phone ?? '').toLowerCase().includes(phoneQuery)) &&
+        (categoryFilter === 'all' || e.category?.id === categoryFilter),
     )
-  }, [employees, showInactive, search])
+  }, [employees, showInactive, nameSearch, phoneSearch, categoryFilter])
   const inactiveCount = (employees ?? []).filter((e) => !e.active).length
 
   // הגעה ממקום אחר באפליקציה דרך EmployeeHoverCard ("מעבר לפרטי עובדת") — /staff?search=<שם>.
-  // מזריקה את השם לשדה החיפוש כאן, כדי שהטבלה תסונן ישירות לשורה שלה. מנקה את פרמטר ה-query
+  // מזריקה את השם לשדה חיפוש השם כאן, כדי שהטבלה תסונן ישירות לשורה שלה. מנקה את פרמטר ה-query
   // אחרי שימוש כדי שלא יידרס חיפוש ידני אם המשתמשת פשוט מרעננת/חוזרת לעמוד.
   useEffect(() => {
     const target = searchParams.get('search')
     if (!target) return
-    setSearch(target)
+    setNameSearch(target)
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
 
@@ -95,6 +105,7 @@ export default function Employees() {
       status: employee.status,
       is_preferred: employee.is_preferred,
       notes: employee.notes ?? '',
+      category_id: employee.category_id,
     })
     setFormError(null)
   }
@@ -166,7 +177,7 @@ export default function Employees() {
         <div>
           <h1 className="text-xl font-bold">רשימת עובדות</h1>
           <div className="mt-1 text-[13px] text-ink-soft">
-            כלל העובדות הקבועות והמ"מ — שם, טלפון, מייל, תפקיד
+            כלל העובדות הקבועות והמ"מ — שם, טלפון, מייל, תפקיד, הערות
           </div>
         </div>
         {canEdit && (
@@ -181,13 +192,35 @@ export default function Employees() {
       </div>
 
       <div className="mb-4 flex items-center justify-between gap-2 print:hidden">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="חיפוש לפי שם…"
-          className="w-56 rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={nameSearch}
+            onChange={(e) => setNameSearch(e.target.value)}
+            placeholder="חיפוש לפי שם…"
+            className="w-48 rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
+          />
+          <input
+            type="text"
+            value={phoneSearch}
+            onChange={(e) => setPhoneSearch(e.target.value)}
+            placeholder="חיפוש לפי טלפון…"
+            dir="ltr"
+            className="w-48 rounded-lg border border-line bg-white px-3 py-2 text-right text-[13px] outline-none focus:border-accent"
+          />
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
+          >
+            <option value="all">כל הקטגוריות</option>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {inactiveCount > 0 && (
           <label className="flex items-center gap-1.5 text-[12px] text-ink-soft">
             <input
@@ -206,17 +239,19 @@ export default function Employees() {
             <tr>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">שם</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">תפקיד</th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">קטגוריה</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">סטטוס</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">טלפון</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">מייל</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">מועדפת</th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">הערות</th>
               <th className="border-b border-line px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-4 text-center text-ink-soft">טוען…</td>
+                <td colSpan={9} className="px-3 py-4 text-center text-ink-soft">טוען…</td>
               </tr>
             ) : visibleEmployees.length > 0 ? (
               visibleEmployees.map((emp) => (
@@ -231,14 +266,26 @@ export default function Employees() {
                   </td>
                   <td className="border-t border-line px-3 py-2">{emp.employee_type?.label ?? '—'}</td>
                   <td className="border-t border-line px-3 py-2">
-                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">
-                      {EMPLOYEE_STATUS_LABELS[emp.status]}
-                    </span>
+                    {emp.category ? (
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: emp.category.color }}
+                        />
+                        {emp.category.name}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
+                  <td className="border-t border-line px-3 py-2">{EMPLOYEE_STATUS_LABELS[emp.status]}</td>
                   <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.phone ?? '—'}</td>
                   <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.email ?? '—'}</td>
                   <td className="border-t border-line px-3 py-2">
                     {emp.status === 'substitute' ? (emp.is_preferred ? '⭐ כן' : 'לא') : '—'}
+                  </td>
+                  <td className="max-w-[200px] truncate border-t border-line px-3 py-2 text-ink-soft" title={emp.notes ?? undefined}>
+                    {emp.notes || '—'}
                   </td>
                   <td className="border-t border-line px-3 py-2">
                     {canEdit && (
@@ -282,8 +329,10 @@ export default function Employees() {
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="px-3 py-4 text-center text-ink-soft">
-                  {search.trim() ? 'אין עובדת התואמת את החיפוש.' : 'אין עדיין עובדות מוגדרות.'}
+                <td colSpan={9} className="px-3 py-4 text-center text-ink-soft">
+                  {nameSearch.trim() || phoneSearch.trim()
+                    ? 'אין עובדת התואמת את החיפוש.'
+                    : 'אין עדיין עובדות מוגדרות.'}
                 </td>
               </tr>
             )}
@@ -353,6 +402,24 @@ export default function Employees() {
                   />
                 </label>
               </div>
+
+              <label className="block">
+                <span className="mb-1 block text-[13px] text-ink-soft">קטגוריה (רשות)</span>
+                <select
+                  value={form.category_id ?? ''}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, category_id: e.target.value ? Number(e.target.value) : null }))
+                  }
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
+                >
+                  <option value="">ללא קטגוריה</option>
+                  {categories?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="block">
                 <span className="mb-1 block text-[13px] text-ink-soft">סטטוס</span>
