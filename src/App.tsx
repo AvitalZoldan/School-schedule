@@ -19,6 +19,7 @@ import Classes from './pages/Classes'
 import Employees from './pages/Employees'
 import Management from './pages/Management'
 import SystemAdmin from './pages/SystemAdmin'
+import ContactRequests from './pages/ContactRequests'
 
 export default function App() {
   return (
@@ -51,6 +52,14 @@ export default function App() {
           element={
             <RequireSystemAdmin>
               <SystemAdmin />
+            </RequireSystemAdmin>
+          }
+        />
+        <Route
+          path="contact-requests"
+          element={
+            <RequireSystemAdmin>
+              <ContactRequests />
             </RequireSystemAdmin>
           }
         />

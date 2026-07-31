@@ -54,19 +54,34 @@ export function Sidebar() {
         ))}
 
         {profile?.is_system_admin && (
-          <NavLink
-            to="/system-admin"
-            className={({ isActive }) =>
-              [
-                'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',
-                isActive
-                  ? 'bg-accent font-semibold text-white'
-                  : 'text-[#c7cad0] hover:bg-[#2a3340] hover:text-white',
-              ].join(' ')
-            }
-          >
-            ניהול מערכת
-          </NavLink>
+          <>
+            <NavLink
+              to="/system-admin"
+              className={({ isActive }) =>
+                [
+                  'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',
+                  isActive
+                    ? 'bg-accent font-semibold text-white'
+                    : 'text-[#c7cad0] hover:bg-[#2a3340] hover:text-white',
+                ].join(' ')
+              }
+            >
+              ניהול מערכת
+            </NavLink>
+            <NavLink
+              to="/contact-requests"
+              className={({ isActive }) =>
+                [
+                  'rounded-lg px-3 py-2.5 text-[13.5px] transition-colors',
+                  isActive
+                    ? 'bg-accent font-semibold text-white'
+                    : 'text-[#c7cad0] hover:bg-[#2a3340] hover:text-white',
+                ].join(' ')
+              }
+            >
+              פניות משתמשים
+            </NavLink>
+          </>
         )}
       </nav>
 
