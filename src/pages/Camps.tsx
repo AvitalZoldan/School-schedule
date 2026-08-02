@@ -49,10 +49,6 @@ export default function Camps() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">ניהול קייטנות</h1>
-          <div className="mt-1 text-[13px] text-ink-soft">
-            כל קייטנה היא ישות עצמאית עם שיבוץ בסיסי, שיבוץ מ"מ יומי ומערכת פתיחות משלה. נשמרות
-            להיסטוריה לצמיתות.
-          </div>
         </div>
         {canEdit && (
           <button
@@ -60,7 +56,7 @@ export default function Camps() {
             onClick={() => setModal({ kind: 'create' })}
             className="shrink-0 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
           >
-            + קייטנה חדשה
+            הוספת קייטנה +
           </button>
         )}
       </div>

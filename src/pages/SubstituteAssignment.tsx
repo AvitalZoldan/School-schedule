@@ -96,7 +96,8 @@ export default function SubstituteAssignment() {
   )
 
   const ctx = useMemo(
-    () => (data ? buildResolveContext(data.absences, data.leaves, data.dailyAssignments) : null),
+    () =>
+      data ? buildResolveContext(data.absences, data.leaves, data.dailyAssignments, data.urgencyOverrides) : null,
     [data],
   )
 

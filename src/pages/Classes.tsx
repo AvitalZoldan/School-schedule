@@ -121,10 +121,6 @@ export default function Classes() {
       </div>
 
       <div className="mb-4 flex items-center justify-between rounded-lg border border-line bg-panel px-3 py-2.5 text-[12.5px] text-ink-soft">
-        <span>
-          כיתות מוגדרות מחדש בכל שנה, ללא קישור לכיתות של שנה קודמת. שינוי שם/מספר כיתות כאן
-          אינו משפיע על שנים קודמות בהיסטוריה.
-        </span>
         {inactiveCount > 0 && (
           <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] print:hidden">
             <input
@@ -272,7 +268,7 @@ export default function Classes() {
                   disabled={isSaving}
                   className="flex-1 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {isSaving ? 'שומרת…' : modal.kind === 'create' ? 'הוספת כיתה' : 'שמירה'}
+                  {isSaving ? 'שמירה...' : modal.kind === 'create' ? 'הוספת כיתה' : 'שמירה'}
                 </button>
               </div>
             </form>

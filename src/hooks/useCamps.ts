@@ -304,6 +304,7 @@ export function useCampDashboardData(
         dailyAssignments: (assignmentsRes.data ?? []) as DailyAssignmentRow[],
         absences: (absencesRes.data ?? []) as DailyAbsenceRow[],
         leaves: (leavesRes.data ?? []) as EmployeeLeaveRow[],
+        urgencyOverrides: [],
       }
     },
   })

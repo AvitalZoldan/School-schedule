@@ -140,9 +140,6 @@ export default function AuxiliarySystems() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">מערכות עזר</h1>
-          <div className="mt-1 text-[13px] text-ink-soft">
-            טבלה שבועית קבועה לכל מערכת — תפקיד × יום בשבוע, פעם אחת ביום (למשל פתיחות/סגירות)
-          </div>
         </div>
         {canEdit && (
           <button
@@ -150,7 +147,7 @@ export default function AuxiliarySystems() {
             onClick={openSystemModal}
             className="shrink-0 rounded-lg border border-line bg-white px-3 py-2 text-[13px] font-semibold hover:bg-[#f2f0ea] print:hidden"
           >
-            + מערכת חדשה
+            + הוספת מערכת
           </button>
         )}
       </div>
@@ -174,7 +171,7 @@ export default function AuxiliarySystems() {
           {selectedSystem && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-panel p-3 text-[12.5px] text-ink-soft print:hidden">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span>מקור צוות המועמדות:</span>
+                <span>בחירת צוות המשובצות ב...</span>
                 {canEdit ? (
                   <select
                     value={selectedSystem.source_day_part}
@@ -195,7 +192,7 @@ export default function AuxiliarySystems() {
                   <span className="font-medium text-ink">{STAFF_SOURCE_LABELS[selectedSystem.source_day_part]}</span>
                 )}
                 {' · '}
-                הצגה בחוסרים (דשבורד/שיבוץ מ"מ):{' '}
+                הצגה בחוסרים:{' '}
                 <span className="font-medium text-ink">{selectedSystem.show_in_missing ? 'כן' : 'לא'}</span>
               </div>
               {canEdit && (
@@ -309,7 +306,6 @@ export default function AuxiliarySystems() {
                 : `רשימת הבחירה בכל יום מוגבלת לעובדות המשובצות לחור ${
                     selectedSystem?.source_day_part === 'afternoon' ? 'צהריים' : 'בוקר'
                   } כלשהו, בכיתה כלשהי, ביום זה (מהשיבוץ הבסיסי הפעיל).`}{' '}
-              תא לא-מאויש מודגש באדום.
             </div>
           </div>
         </>
@@ -326,7 +322,6 @@ export default function AuxiliarySystems() {
                   autoFocus
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value)}
-                  placeholder="לדוגמה: וידאו בכיתת שקד"
                   className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
                 />
               </label>
@@ -350,7 +345,7 @@ export default function AuxiliarySystems() {
                   disabled={createRole.isPending}
                   className="flex-1 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {createRole.isPending ? 'שומרת…' : 'הוספה'}
+                  {createRole.isPending ? 'שמירה...' : 'הוספה'}
                 </button>
               </div>
             </form>
@@ -369,7 +364,6 @@ export default function AuxiliarySystems() {
                   autoFocus
                   value={newSystemName}
                   onChange={(e) => setNewSystemName(e.target.value)}
-                  placeholder="לדוגמה: מערכת סגירות"
                   className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
                 />
               </label>
@@ -393,7 +387,7 @@ export default function AuxiliarySystems() {
                   checked={newSystemShowInMissing}
                   onChange={(e) => setNewSystemShowInMissing(e.target.checked)}
                 />
-                הצגת חורים של מערכת זו בדשבורד ובשיבוץ מ"מ
+                הצגת חורים של מערכת זו בדף הבית ובשיבוץ מ"מ
               </label>
 
               {systemFormError && (
@@ -413,7 +407,7 @@ export default function AuxiliarySystems() {
                   disabled={createSystem.isPending}
                   className="flex-1 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {createSystem.isPending ? 'שומרת…' : 'יצירה'}
+                  {createSystem.isPending ? 'שמירה...' : 'יצירה'}
                 </button>
               </div>
             </form>

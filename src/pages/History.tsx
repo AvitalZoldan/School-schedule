@@ -192,10 +192,6 @@ export default function History() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">היסטוריה</h1>
-          <div className="mt-1 text-[13px] text-ink-soft">
-            יומן שינויים בשיבוץ מ"מ יומי ובהיעדרויות — בדשבורד ובמסכי הקייטנות. מתעד מהיום שהמעקב
-            הופעל והלאה בלבד.
-          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 print:hidden">

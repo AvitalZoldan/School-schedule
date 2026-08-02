@@ -153,8 +153,8 @@ export default function Employees() {
     if (!schoolId) return
     const hasSubDays = (leave.leave_day_assignments ?? []).length > 0
     const message = hasSubDays
-      ? 'האם את בטוחה שברצונך לבטל את החופשה? מ"מ שכבר שובצו כמחליפות יימחקו.'
-      : 'האם את בטוחה שברצונך לבטל את החופשה?'
+      ? 'האם לבטל את החופשה? מ"מ שכבר שובצו כמחליפות יימחקו.'
+      : 'האם לבטל את החופשה?'
     if (!(await confirm(message))) return
     cancelLeave.mutate({ schoolId, leaveId: leave.id })
   }
@@ -176,9 +176,6 @@ export default function Employees() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">רשימת עובדות</h1>
-          <div className="mt-1 text-[13px] text-ink-soft">
-            כלל העובדות הקבועות והמ"מ — שם, טלפון, מייל, תפקיד, הערות
-          </div>
         </div>
         {canEdit && (
           <button
@@ -186,7 +183,7 @@ export default function Employees() {
             onClick={openCreateModal}
             className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
           >
-            + עובדת חדשה
+            הוספת עובדת +
           </button>
         )}
       </div>
@@ -204,7 +201,7 @@ export default function Employees() {
             type="text"
             value={phoneSearch}
             onChange={(e) => setPhoneSearch(e.target.value)}
-            placeholder="חיפוש לפי טלפון…"
+            placeholder="...חיפוש לפי טלפון"
             dir="ltr"
             className="w-48 rounded-lg border border-line bg-white px-3 py-2 text-right text-[13px] outline-none focus:border-accent"
           />
@@ -243,7 +240,6 @@ export default function Employees() {
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">סטטוס</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">טלפון</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">מייל</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">מועדפת</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">הערות</th>
               <th className="border-b border-line px-3 py-2.5" />
             </tr>
@@ -281,9 +277,6 @@ export default function Employees() {
                   <td className="border-t border-line px-3 py-2">{EMPLOYEE_STATUS_LABELS[emp.status]}</td>
                   <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.phone ?? '—'}</td>
                   <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.email ?? '—'}</td>
-                  <td className="border-t border-line px-3 py-2">
-                    {emp.status === 'substitute' ? (emp.is_preferred ? '⭐ כן' : 'לא') : '—'}
-                  </td>
                   <td className="max-w-[200px] truncate border-t border-line px-3 py-2 text-ink-soft" title={emp.notes ?? undefined}>
                     {emp.notes || '—'}
                   </td>
@@ -338,17 +331,13 @@ export default function Employees() {
             )}
           </tbody>
         </table>
-        <div className="border-t border-line px-3 py-2.5 text-[12px] text-ink-soft">
-          מ"מ המסומנות ⭐ מועדפת מוצגות ראשונות ברשימת הבחירה במסך הדאשבורד. הסרת עובדת מסתירה
-          אותה מרשימות הבחירה בלבד — היסטוריית השיבוצים שלה נשמרת.
-        </div>
       </div>
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div className="w-full max-w-[420px] rounded-xl border border-line bg-panel p-6 shadow-lg">
             <h2 className="mb-4 text-lg font-bold">
-              {modal.kind === 'create' ? 'עובדת חדשה' : 'עריכת עובדת'}
+              {modal.kind === 'create' ? 'הוספת עובדת' : 'עריכת עובדת'}
             </h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <label className="block">
@@ -435,17 +424,6 @@ export default function Employees() {
                 </select>
               </label>
 
-              {form.status === 'substitute' && (
-                <label className="flex items-center gap-2 text-[13px]">
-                  <input
-                    type="checkbox"
-                    checked={form.is_preferred}
-                    onChange={(e) => setForm((f) => ({ ...f, is_preferred: e.target.checked }))}
-                  />
-                  מ"מ מועדפת (מוצגת ראשונה ברשימת הבחירה)
-                </label>
-              )}
-
               <label className="block">
                 <span className="mb-1 block text-[13px] text-ink-soft">הערות</span>
                 <textarea
@@ -475,7 +453,7 @@ export default function Employees() {
                   disabled={isSaving}
                   className="flex-1 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {isSaving ? 'שומרת…' : 'שמירה'}
+                  {isSaving ? 'שמירה...' : 'שמירה'}
                 </button>
               </div>
             </form>

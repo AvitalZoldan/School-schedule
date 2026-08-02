@@ -146,7 +146,7 @@ export default function EmployeeReport() {
             value={employeeId ?? ''}
             onChange={(e) => setEmployeeId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">בחרי עובדת…</option>
+            <option value="">דוח עבור…</option>
             {sortedEmployees.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.full_name}

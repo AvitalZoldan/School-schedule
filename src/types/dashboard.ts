@@ -35,6 +35,16 @@ export interface LeaveDayAssignmentRow {
   employee_id: number
 }
 
+// דריסה חד-פעמית של רמת הדחיפות של חור לתאריך ספציפי — לא נוגעת ב-criticality הקבוע של
+// template_slots (ראו resolveSlotStatus ב-resolveDashboard.ts)
+export interface DailySlotUrgencyRow {
+  id: number
+  school_id: number
+  slot_id: number
+  assignment_date: string
+  urgency: 'critical' | 'normal' | 'not_required'
+}
+
 export interface LeaveReminderDismissalRow {
   id: number
   school_id: number
@@ -59,11 +69,11 @@ export interface EmployeeLeaveRow {
 // "no_slot" (למשל צהריים בשישי) מטופל ברמת ClassGrid לפני קריאה ל-resolveSlotStatus,
 // ולכן אינו חלק מהטיפוס הזה — resolveSlotStatus תמיד מקבל slot קיים.
 export type SlotDayStatus =
-  | { kind: 'not_required' }
+  | { kind: 'not_required'; isUrgencyOverridden: boolean }
   | { kind: 'filled_permanent'; employeeId: number }
   | { kind: 'filled_sub'; employeeId: number; assignmentId: number }
   | { kind: 'filled_leave_sub'; employeeId: number }
-  | { kind: 'missing'; criticality: 'critical' | 'normal' }
+  | { kind: 'missing'; criticality: 'critical' | 'normal'; isUrgencyOverridden: boolean }
 
 // היכן עובדת מסוימת כבר תפוסה בפועל, לתאריך+חלק-יום נתונים — לשימוש בזרימת "העברה" (ראו
 // resolveDashboard.computeOccupancyMap ו-DashboardSlotCell)

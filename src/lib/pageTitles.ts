@@ -1,6 +1,6 @@
 // מיפוי מסלול → כותרת עברית, לתפריט הצד (מקור אמת יחיד למניעת כפילות תוויות)
 export const NAV_ITEMS = [
-  { to: '/', label: 'דאשבורד', end: true },
+  { to: '/', label: 'דף הבית', end: true },
   { to: '/base', label: 'שיבוץ צוות קבוע בכיתות' },
   { to: '/missing', label: 'שיבוץ מ"מ' },
   { to: '/employee', label: 'דוח לעובדת' },

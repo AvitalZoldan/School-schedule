@@ -141,14 +141,14 @@ export default function Draft() {
             }}
             className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {activeTemplate ? 'צרי טיוטה מהשיבוץ הפעיל' : 'צרי טיוטה חדשה'}
+            {activeTemplate ? 'יצירת טיוטה מהשיבוץ הפעיל' : 'יצירת טיוטה חדשה'}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-warn-soft px-3 py-2 print:hidden">
             <div className="text-[12.5px] text-warn">
-              עורכת טיוטה — השינויים כאן לא משפיעים על השיבוץ הפעיל עד ל"החלת טיוטה".
+              עריכת טיוטה — השינויים כאן לא משפיעים על השיבוץ הפעיל עד ל"החלת טיוטה".
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -157,7 +157,7 @@ export default function Draft() {
                 onClick={handleDiscard}
                 className="rounded-md border border-line bg-white px-3 py-1.5 text-[12.5px] text-ink-soft hover:bg-[#f2f0ea] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                מחקי טיוטה
+                מחיקת טיוטה
               </button>
               <button
                 type="button"
@@ -165,7 +165,7 @@ export default function Draft() {
                 onClick={handleApply}
                 className="rounded-md bg-accent px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                החילי טיוטה
+                החלת טיוטה
               </button>
             </div>
           </div>

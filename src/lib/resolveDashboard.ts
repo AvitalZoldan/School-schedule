@@ -2,6 +2,7 @@ import type { DayPart, TemplateSlotWithEmployee } from '../types/schedule'
 import type {
   DailyAbsenceRow,
   DailyAssignmentRow,
+  DailySlotUrgencyRow,
   EmployeeLeaveRow,
   LeaveDayAssignmentRow,
   SlotDayStatus,
@@ -20,12 +21,14 @@ export interface ResolveContext {
   leavesByEmployee: Map<number, EmployeeLeaveRow[]>
   leaveSubBySlotDate: Map<string, LeaveDayAssignmentRow> // key: `${slotId}:${date}`
   dailyAssignBySlotDate: Map<string, DailyAssignmentRow> // key: `${slotId}:${date}`
+  urgencyBySlotDate: Map<string, DailySlotUrgencyRow> // key: `${slotId}:${date}`
 }
 
 export function buildResolveContext(
   absences: DailyAbsenceRow[],
   leaves: EmployeeLeaveRow[],
   dailyAssignments: DailyAssignmentRow[],
+  urgencyOverrides: DailySlotUrgencyRow[] = [],
 ): ResolveContext {
   const absenceSet = new Set(absences.map((a) => `${a.employee_id}:${a.absence_date}:${a.day_part ?? 'all'}`))
 
@@ -44,7 +47,12 @@ export function buildResolveContext(
     dailyAssignBySlotDate.set(`${da.slot_id}:${da.assignment_date}`, da)
   }
 
-  return { absenceSet, leavesByEmployee, leaveSubBySlotDate, dailyAssignBySlotDate }
+  const urgencyBySlotDate = new Map<string, DailySlotUrgencyRow>()
+  for (const u of urgencyOverrides) {
+    urgencyBySlotDate.set(`${u.slot_id}:${u.assignment_date}`, u)
+  }
+
+  return { absenceSet, leavesByEmployee, leaveSubBySlotDate, dailyAssignBySlotDate, urgencyBySlotDate }
 }
 
 function isOnLeave(ctx: ResolveContext, employeeId: number, date: string): boolean {
@@ -106,8 +114,17 @@ export function resolveSlotStatus(
     return { kind: 'filled_sub', employeeId: dailyAssign.employee_id, assignmentId: dailyAssign.id }
   }
 
-  if (slot.criticality === 'not_required') return { kind: 'not_required' }
-  return { kind: 'missing', criticality: slot.criticality }
+  const override = ctx.urgencyBySlotDate.get(`${slot.id}:${date}`)
+  const effectiveCriticality = override?.urgency ?? slot.criticality
+
+  if (effectiveCriticality === 'not_required') {
+    return { kind: 'not_required', isUrgencyOverridden: !!override }
+  }
+  return {
+    kind: 'missing',
+    criticality: effectiveCriticality,
+    isUrgencyOverridden: !!override,
+  }
 }
 
 // לכל (תאריך, חלק-יום, עובדת) שכבר תפוסה בפועל (בכל כיתה שהיא) — היכן בדיוק היא משובצת.

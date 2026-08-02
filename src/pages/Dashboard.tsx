@@ -107,7 +107,8 @@ export default function Dashboard() {
   )
 
   const ctx = useMemo(
-    () => (data ? buildResolveContext(data.absences, data.leaves, data.dailyAssignments) : null),
+    () =>
+      data ? buildResolveContext(data.absences, data.leaves, data.dailyAssignments, data.urgencyOverrides) : null,
     [data],
   )
 
@@ -157,7 +158,6 @@ export default function Dashboard() {
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <h1 className="text-xl font-bold">לוח בקרה</h1>
 
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedToggle

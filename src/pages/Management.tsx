@@ -174,9 +174,8 @@ function CategoriesSection({ schoolId, canEdit }: { schoolId: number | undefined
     <div className="rounded-xl border border-line bg-panel p-[18px]">
       <div className="mb-1 text-[13px] font-bold">קטגוריות עובדות</div>
       <div className="mb-3 text-[12px] text-ink-soft">
-        קטגוריה חופשית לסיווג עובדות (למשל "צוות קבוע"/"צוות חיצוני") — נבחרת בטופס עובדת במסך
-        "רשימת עובדות", ומוצגת שם עם הצבע שהוגדר כאן. אפשר גם לסנן לפיה.
-      </div>
+        קטגוריה חופשית להגדרת קבוצת עובדות. מוצגת במסך רשימת עובדות.
+    </div>
 
       {canEdit && (
         <form onSubmit={handleSubmit} className="mb-4 flex flex-wrap items-end gap-2 print:hidden">
@@ -336,7 +335,7 @@ function HolidaysSection({
     <div className="rounded-xl border border-line bg-panel p-[18px]">
       <div className="mb-1 text-[13px] font-bold">ימי חופש</div>
       <div className="mb-3 text-[12px] text-ink-soft">
-        תאריך שמסומן כיום חופש מוצג כלא-פעיל בלוח הבקרה (בלי שיבוץ צוות), ומוסתר לגמרי ממסך "שיבוץ
+        תאריך שמסומן כיום חופש מוצג כלא-פעיל בלוח הבקרה, ומוסתר לגמרי ממסך "שיבוץ
         מ"מ".
       </div>
 

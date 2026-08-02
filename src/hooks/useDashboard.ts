@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { ClassRow, DayPart, TemplateSlotWithEmployee } from '../types/schedule'
-import type { DailyAbsenceRow, DailyAssignmentRow, EmployeeLeaveRow } from '../types/dashboard'
+import type { DailyAbsenceRow, DailyAssignmentRow, DailySlotUrgencyRow, EmployeeLeaveRow } from '../types/dashboard'
 
 export interface DashboardClassData {
   classRow: ClassRow
@@ -14,6 +14,7 @@ export interface DashboardData {
   dailyAssignments: DailyAssignmentRow[]
   absences: DailyAbsenceRow[]
   leaves: EmployeeLeaveRow[]
+  urgencyOverrides: DailySlotUrgencyRow[]
 }
 
 // שולף את כל מה שדרוש כדי "לפתור" את מצב הכיתות לטווח תאריכים נבחר (יום/שבוע נוכחי, 5.2):
@@ -66,7 +67,7 @@ export function useDashboardData(
 
       const allSlotIds = classes.flatMap((c) => c.slots.map((s) => s.id))
 
-      const [assignmentsRes, absencesRes, leavesRes] = await Promise.all([
+      const [assignmentsRes, absencesRes, leavesRes, urgencyRes] = await Promise.all([
         allSlotIds.length > 0
           ? supabase
               .from('daily_assignments')
@@ -89,17 +90,28 @@ export function useDashboardData(
           .eq('status', 'active')
           .lte('start_date', endDate!)
           .gte('end_date', startDate!),
+        allSlotIds.length > 0
+          ? supabase
+              .from('daily_slot_urgency')
+              .select('*')
+              .eq('school_id', schoolId!)
+              .in('slot_id', allSlotIds)
+              .gte('assignment_date', startDate!)
+              .lte('assignment_date', endDate!)
+          : Promise.resolve({ data: [], error: null }),
       ])
 
       if (assignmentsRes.error) throw assignmentsRes.error
       if (absencesRes.error) throw absencesRes.error
       if (leavesRes.error) throw leavesRes.error
+      if (urgencyRes.error) throw urgencyRes.error
 
       return {
         classes,
         dailyAssignments: (assignmentsRes.data ?? []) as DailyAssignmentRow[],
         absences: (absencesRes.data ?? []) as DailyAbsenceRow[],
         leaves: (leavesRes.data ?? []) as EmployeeLeaveRow[],
+        urgencyOverrides: (urgencyRes.data ?? []) as DailySlotUrgencyRow[],
       }
     },
   })
@@ -195,6 +207,30 @@ export function useMarkAbsence() {
         day_part: input.dayPart,
         reported_by: input.reportedBy,
       })
+      if (error) throw error
+    },
+    onSuccess: () => invalidateDashboard(queryClient),
+  })
+}
+
+interface SetSlotUrgencyInput {
+  schoolId: number
+  slotId: number
+  date: string
+  urgency: 'critical' | 'normal' | 'not_required'
+}
+
+// דחיפות חד-פעמית לחור בתאריך קונקרטי, מהדשבורד — לא נוגעת בקריטיות הקבועה של המשבצת בתבנית
+export function useSetSlotUrgency() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: SetSlotUrgencyInput) => {
+      const { error } = await supabase
+        .from('daily_slot_urgency')
+        .upsert(
+          { school_id: input.schoolId, slot_id: input.slotId, assignment_date: input.date, urgency: input.urgency },
+          { onConflict: 'school_id,slot_id,assignment_date' },
+        )
       if (error) throw error
     },
     onSuccess: () => invalidateDashboard(queryClient),
