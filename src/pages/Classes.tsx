@@ -10,6 +10,7 @@ import {
 } from '../hooks/useClasses'
 import { useAuth } from '../lib/AuthContext'
 import { useConfirm } from '../components/common/ConfirmProvider'
+import { useRoleTypesOverview } from '../hooks/useRoleTypes'
 
 const STATUS_LABEL: Record<ClassOverviewRow['status'], string> = {
   complete: 'הושלם',
@@ -32,9 +33,22 @@ export default function Classes() {
   const navigate = useNavigate()
 
   const { data: classes, isLoading } = useClassesOverview(schoolId)
+  const { data: roleTypes } = useRoleTypesOverview(schoolId)
   const createClass = useCreateClass()
   const updateClass = useUpdateClass()
   const confirm = useConfirm()
+
+  const defaultRolesSummary = useMemo(() => {
+    const active = (roleTypes ?? []).filter((t) => t.active)
+    if (active.length === 0) return null
+    return active
+      .map((t) => {
+        const morning = t.defaults.find((d) => d.day_part === 'morning')?.count ?? 0
+        const afternoon = t.defaults.find((d) => d.day_part === 'afternoon')?.count ?? 0
+        return `${t.name} (${morning}/${afternoon})`
+      })
+      .join(', ')
+  }, [roleTypes])
 
   const [showInactive, setShowInactive] = useState(false)
   const [modal, setModal] = useState<ModalMode | null>(null)
@@ -237,15 +251,19 @@ export default function Classes() {
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder='לדוגמה: א׳3'
                   className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
                 />
               </label>
 
               {modal.kind === 'create' && (
                 <div className="mb-4 rounded-lg bg-[#f2f0ea] px-3 py-2 text-[12px] text-ink-soft">
-                  תיווצר לכיתה תבנית שיבוץ בסיסית ריקה: מורה + 2 סייעות, בוקר וצהריים, לכל ימי
-                  השבוע. ניתן לערוך כל חור לאחר היצירה.
+                  {defaultRolesSummary ? (
+                    <>
+                     ניתן לערוך את תבנית הכיתה במסך הגדרות
+                    </>
+                  ) : (
+                    'תיווצר לכיתה תבנית שיבוץ בסיסית ריקה, בוקר וצהריים, לכל ימי השבוע. ניתן לערוך כל חור לאחר היצירה.'
+                  )}
                 </div>
               )}
 

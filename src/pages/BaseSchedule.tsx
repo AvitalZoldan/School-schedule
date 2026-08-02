@@ -89,14 +89,15 @@ export default function BaseSchedule() {
             type="button"
             disabled={seedDefaultSlots.isPending}
             onClick={() =>
+              schoolId &&
               seedDefaultSlots.mutate(
-                { templateId: template.id },
+                { templateId: template.id, schoolId },
                 { onError: (error) => alert(`שחזור החורים נכשל: ${error.message}`) },
               )
             }
             className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            צרי חורי ברירת מחדל (מורה + 2 סייעות)
+            צרי חורי ברירת מחדל
           </button>
         </div>
       ) : (

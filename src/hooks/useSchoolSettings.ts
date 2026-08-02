@@ -9,6 +9,12 @@ export interface SchoolSettingsRow {
   dashboard_default_range: DashboardDefaultRange
   date_display: DateDisplayMode
   updated_at: string
+  morning_label: string
+  morning_start: string | null
+  morning_end: string | null
+  afternoon_label: string
+  afternoon_start: string | null
+  afternoon_end: string | null
 }
 
 // פרמטרים ברמת בית-ספר, נערכים במסך "ניהול" — כרגע: תצוגת ברירת מחדל בדאשבורד (יום/שבוע).
@@ -31,7 +37,19 @@ export function useSchoolSettings(schoolId: number | undefined) {
 
 interface UpdateSchoolSettingsInput {
   schoolId: number
-  patch: Partial<Pick<SchoolSettingsRow, 'dashboard_default_range' | 'date_display'>>
+  patch: Partial<
+    Pick<
+      SchoolSettingsRow,
+      | 'dashboard_default_range'
+      | 'date_display'
+      | 'morning_label'
+      | 'morning_start'
+      | 'morning_end'
+      | 'afternoon_label'
+      | 'afternoon_start'
+      | 'afternoon_end'
+    >
+  >
 }
 
 export function useUpdateSchoolSettings() {

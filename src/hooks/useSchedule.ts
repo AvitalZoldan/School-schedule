@@ -153,29 +153,39 @@ export function useCleanupDuplicateSlots() {
 }
 
 // שחזור חורי ברירת מחדל לתבנית קיימת שהתרוקנה מ-slots (למשל תקלה) — אותו מבנה בדיוק כמו
-// ב-create_class_with_default_schedule (RPC של יצירת כיתה חדשה): מורה (קריטי) + 2 סייעות
-// (רגיל) × בוקר/צהריים × 6 ימי שבוע = 36 חורים, כולם ללא שיבוץ עובדת קבועה
-const DEFAULT_ROLES: { role: string; criticality: Criticality }[] = [
-  { role: 'מורה', criticality: 'critical' },
-  { role: 'סייעת 1', criticality: 'normal' },
-  { role: 'סייעת 2', criticality: 'normal' },
-]
-
+// ב-create_class_with_default_schedule (RPC של יצירת כיתה חדשה): נשלף מ-role_type_defaults
+// של בית הספר (מסך "ניהול") × בוקר/צהריים × 6 ימי שבוע, כולם ללא שיבוץ עובדת קבועה
 export function useSeedDefaultSlots() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ templateId }: { templateId: number }) => {
+    mutationFn: async ({ templateId, schoolId }: { templateId: number; schoolId: number }) => {
+      const [typesRes, defaultsRes] = await Promise.all([
+        supabase.from('role_types').select('id, name, sort_order').eq('school_id', schoolId).eq('active', true),
+        supabase.from('role_type_defaults').select('role_type_id, day_part, count, criticality').eq('school_id', schoolId),
+      ])
+      if (typesRes.error) throw typesRes.error
+      if (defaultsRes.error) throw defaultsRes.error
+      const types = typesRes.data as { id: number; name: string; sort_order: number }[]
+      const defaults = defaultsRes.data as {
+        role_type_id: number
+        day_part: 'morning' | 'afternoon'
+        count: number
+        criticality: Criticality
+      }[]
+      const typeById = new Map(types.map((t) => [t.id, t]))
+
       const rows = []
       for (let weekday = 1; weekday <= 6; weekday++) {
-        for (const dayPart of ['morning', 'afternoon'] as const) {
-          for (const { role, criticality } of DEFAULT_ROLES) {
+        for (const def of defaults.filter((d) => d.count > 0 && typeById.has(d.role_type_id))) {
+          const type = typeById.get(def.role_type_id)!
+          for (let i = 1; i <= def.count; i++) {
             rows.push({
               template_id: templateId,
               weekday,
-              day_part: dayPart,
-              role,
+              day_part: def.day_part,
+              role: def.count > 1 ? `${type.name} ${i}` : type.name,
               slot_type: 'fixed',
-              criticality,
+              criticality: def.criticality,
               assigned_employee_id: null,
             })
           }

@@ -52,6 +52,25 @@ export interface EmployeeCategoryRow {
   active: boolean
 }
 
+// תפקיד מוגדר-בית-ספר (למשל מורה/סייעת/בת שירות) — נערך במסך "ניהול", ראו RoleTypeDefaultRow
+export interface RoleTypeRow {
+  id: number
+  school_id: number
+  name: string
+  sort_order: number
+  active: boolean
+}
+
+// כמות וקריטיות ברירת מחדל של תפקיד לחלק-יום נתון — נצרך ביצירת כיתה חדשה
+export interface RoleTypeDefaultRow {
+  id: number
+  school_id: number
+  role_type_id: number
+  day_part: DayPart
+  count: number
+  criticality: Criticality
+}
+
 export interface ScheduleTemplateRow {
   id: number
   school_id: number

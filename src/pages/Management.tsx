@@ -8,8 +8,15 @@ import {
   useCreateEmployeeCategory,
   useUpdateEmployeeCategory,
 } from '../hooks/useEmployeeCategories'
+import {
+  useRoleTypesOverview,
+  useCreateRoleType,
+  useUpdateRoleType,
+  useUpdateRoleTypeDefault,
+  type RoleTypeWithDefaults,
+} from '../hooks/useRoleTypes'
 import { formatDisplayDate, parseISODate, systemWeekday, type DateDisplayMode } from '../lib/dateUtils'
-import { WEEKDAY_LABELS, type EmployeeCategoryRow } from '../types/schedule'
+import { WEEKDAY_LABELS, type Criticality, type DayPart, type EmployeeCategoryRow } from '../types/schedule'
 import { SegmentedToggle } from '../components/common/SegmentedToggle'
 import { useConfirm } from '../components/common/ConfirmProvider'
 
@@ -101,10 +108,268 @@ export default function Management() {
           )}
         </div>
 
+        <DayPartHoursSection schoolId={schoolId} canEdit={canEdit} />
+
+        <RoleTypesSection schoolId={schoolId} canEdit={canEdit} />
+
         <CategoriesSection schoolId={schoolId} canEdit={canEdit} />
 
         <HolidaysSection schoolId={schoolId} canEdit={canEdit} dateDisplayMode={dateDisplayMode} />
       </div>
+    </div>
+  )
+}
+
+// שם ושעות תצוגה לכל חלק-יום (בוקר/צהריים) — חלק-היום הטכני (morning/afternoon) עצמו קבוע
+// במערכת; רק התווית והשעות המוצגות ניתנות להתאמה לכל בית ספר. לתצוגה בלבד, לא משפיע על
+// לוגיקת השיבוץ.
+function DayPartHoursSection({ schoolId, canEdit }: { schoolId: number | undefined; canEdit: boolean }) {
+  const { data: settings, isLoading } = useSchoolSettings(schoolId)
+  const updateSettings = useUpdateSchoolSettings()
+
+  function save(field: 'morning_label' | 'morning_start' | 'morning_end' | 'afternoon_label' | 'afternoon_start' | 'afternoon_end', value: string) {
+    if (!schoolId) return
+    updateSettings.mutate({ schoolId, patch: { [field]: value || null } })
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-panel p-[18px]">
+      <div className="mb-1 text-[13px] font-bold">שעות היום</div>
+      <div className="mb-3 text-[12px] text-ink-soft">
+        שם ושעות תצוגה לבוקר ולצהריים (למשל בוקר 08:00–13:00, צהריים 13:00–16:30). לתצוגה בלבד.
+      </div>
+
+      {isLoading || !settings ? (
+        <div className="text-[12.5px] text-ink-soft">טוען…</div>
+      ) : (
+        <div className="flex flex-wrap gap-4 print:hidden">
+          {(
+            [
+              { key: 'morning', label: settings.morning_label, start: settings.morning_start, end: settings.morning_end },
+              { key: 'afternoon', label: settings.afternoon_label, start: settings.afternoon_start, end: settings.afternoon_end },
+            ] as const
+          ).map((part) => (
+            <div key={part.key} className="flex flex-wrap items-end gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[12px] text-ink-soft">שם</span>
+                <input
+                  defaultValue={part.label}
+                  disabled={!canEdit}
+                  onBlur={(e) => save(`${part.key}_label`, e.target.value.trim())}
+                  className="w-24 rounded-lg border border-line bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-accent disabled:opacity-60"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[12px] text-ink-soft">התחלה</span>
+                <input
+                  type="time"
+                  defaultValue={part.start ?? ''}
+                  disabled={!canEdit}
+                  onBlur={(e) => save(`${part.key}_start`, e.target.value)}
+                  className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-accent disabled:opacity-60"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[12px] text-ink-soft">סיום</span>
+                <input
+                  type="time"
+                  defaultValue={part.end ?? ''}
+                  disabled={!canEdit}
+                  onBlur={(e) => save(`${part.key}_end`, e.target.value)}
+                  className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-accent disabled:opacity-60"
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!canEdit && (
+        <div className="mt-2 text-[11.5px] text-ink-soft">משתמשת בהרשאת צפייה בלבד — אין אפשרות לשנות הגדרה זו.</div>
+      )}
+    </div>
+  )
+}
+
+const CRITICALITY_LABEL: Record<Criticality, string> = {
+  critical: 'קריטי',
+  normal: 'רגיל',
+  not_required: 'לא נדרש',
+}
+
+// תפקידים (מורה/סייעת/בת שירות וכו') וכמות ברירת מחדל לכיתה חדשה, לכל חלק-יום — נצרך
+// ב-create_class_with_default_schedule (RPC) וב"שחזור חורי ברירת מחדל" (BaseSchedule)
+function RoleTypesSection({ schoolId, canEdit }: { schoolId: number | undefined; canEdit: boolean }) {
+  const { data: roleTypes, isLoading } = useRoleTypesOverview(schoolId)
+  const createRoleType = useCreateRoleType()
+  const updateRoleType = useUpdateRoleType()
+  const updateDefault = useUpdateRoleTypeDefault()
+  const confirm = useConfirm()
+
+  const [name, setName] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!schoolId) return
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setFormError('יש להזין שם תפקיד')
+      return
+    }
+    try {
+      await createRoleType.mutateAsync({ schoolId, name: trimmed, sortOrder: (roleTypes?.length ?? 0) + 1 })
+      setName('')
+      setFormError(null)
+    } catch {
+      setFormError('השמירה נכשלה. נסי שוב.')
+    }
+  }
+
+  function renameRoleType(rt: RoleTypeWithDefaults, newName: string) {
+    if (!schoolId) return
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === rt.name) return
+    updateRoleType.mutate({ roleTypeId: rt.id, schoolId, name: trimmed })
+  }
+
+  async function toggleActive(rt: RoleTypeWithDefaults) {
+    if (!schoolId) return
+    const message = rt.active
+      ? `להשבית את התפקיד "${rt.name}"? הוא לא ייכלל עוד בברירת המחדל ליצירת כיתה חדשה.`
+      : `לשחזר את התפקיד "${rt.name}"?`
+    if (!(await confirm(message))) return
+    updateRoleType.mutate({ roleTypeId: rt.id, schoolId, active: !rt.active })
+  }
+
+  function setCount(rt: RoleTypeWithDefaults, dayPart: DayPart, count: number) {
+    if (!schoolId) return
+    updateDefault.mutate({ schoolId, roleTypeId: rt.id, dayPart, count: Math.max(0, count) })
+  }
+
+  function setCriticality(rt: RoleTypeWithDefaults, dayPart: DayPart, criticality: Criticality) {
+    if (!schoolId) return
+    updateDefault.mutate({ schoolId, roleTypeId: rt.id, dayPart, criticality })
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-panel p-[18px]">
+      <div className="mb-1 text-[13px] font-bold">תפקידים וכמויות ברירת מחדל</div>
+      <div className="mb-3 text-[12px] text-ink-soft">
+        התפקידים וכמותם בבוקר/צהריים שבהם תיווצר תבנית השיבוץ הבסיסית עבור כיתה חדשה. "דחיפות"
+        קובעת עד כמה קריטי לאייש את התפקיד הזה בשיבוץ היומי.
+      </div>
+
+      {canEdit && (
+        <form onSubmit={handleSubmit} className="mb-4 flex flex-wrap items-end gap-2 print:hidden">
+          <label className="block min-w-[160px] flex-1">
+            <span className="mb-1 block text-[12px] text-ink-soft">שם תפקיד</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={createRoleType.isPending}
+            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            {createRoleType.isPending ? 'מוסיפה…' : '+ הוספת תפקיד'}
+          </button>
+        </form>
+      )}
+
+      {formError && (
+        <div className="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger">{formError}</div>
+      )}
+
+      {isLoading ? (
+        <div className="text-[12.5px] text-ink-soft">טוען…</div>
+      ) : roleTypes && roleTypes.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-[13px]">
+            <thead>
+              <tr className="text-[12px] text-ink-soft">
+                <th className="py-1.5 text-start font-medium">תפקיד</th>
+                <th className="py-1.5 text-center font-medium" colSpan={2}>בוקר</th>
+                <th className="py-1.5 text-center font-medium" colSpan={2}>צהריים</th>
+                <th className="py-1.5"></th>
+              </tr>
+              <tr className="text-[11px] text-ink-soft">
+                <th className="font-normal"></th>
+                <th className="pb-1.5 text-center font-normal">כמות</th>
+                <th className="pb-1.5 text-center font-normal">דחיפות</th>
+                <th className="pb-1.5 text-center font-normal">כמות</th>
+                <th className="pb-1.5 text-center font-normal">דחיפות</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {roleTypes.map((rt) => {
+                const morning = rt.defaults.find((d) => d.day_part === 'morning')
+                const afternoon = rt.defaults.find((d) => d.day_part === 'afternoon')
+                return (
+                  <tr key={rt.id} className={`border-t border-line ${rt.active ? '' : 'opacity-50'}`}>
+                    <td className="py-1.5">
+                      <input
+                        defaultValue={rt.name}
+                        disabled={!canEdit}
+                        onBlur={(e) => renameRoleType(rt, e.target.value)}
+                        className="w-28 rounded-lg border border-transparent bg-transparent px-2 py-1 text-[13px] font-medium outline-none hover:border-line focus:border-accent focus:bg-white disabled:opacity-60"
+                      />
+                      {!rt.active && <span className="text-[11px] text-ink-soft"> (לא פעיל)</span>}
+                    </td>
+                    {(['morning', 'afternoon'] as const).flatMap((dayPart) => {
+                      const def = dayPart === 'morning' ? morning : afternoon
+                      if (!def) return [<td key={`${dayPart}-count`} />, <td key={`${dayPart}-crit`} />]
+                      return [
+                        <td key={`${dayPart}-count`} className="py-1.5">
+                          <input
+                            type="number"
+                            min={0}
+                            disabled={!canEdit}
+                            value={def.count}
+                            onChange={(e) => setCount(rt, dayPart, Number(e.target.value))}
+                            className="mx-auto block w-14 rounded-lg border border-line bg-white px-2 py-1 text-center text-[13px] outline-none focus:border-accent disabled:opacity-60"
+                          />
+                        </td>,
+                        <td key={`${dayPart}-crit`} className="py-1.5">
+                          <select
+                            disabled={!canEdit}
+                            value={def.criticality}
+                            onChange={(e) => setCriticality(rt, dayPart, e.target.value as Criticality)}
+                            className="mx-auto block rounded-lg border border-line bg-white px-2 py-1 text-[12px] text-ink-soft outline-none focus:border-accent disabled:opacity-60"
+                          >
+                            {(Object.keys(CRITICALITY_LABEL) as Criticality[]).map((c) => (
+                              <option key={c} value={c}>
+                                {CRITICALITY_LABEL[c]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>,
+                      ]
+                    })}
+                    <td className="py-1.5 text-end">
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => toggleActive(rt)}
+                          className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                        >
+                          {rt.active ? 'השבתה' : 'שחזור'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-[12.5px] text-ink-soft">אין תפקידים מוגדרים עדיין.</div>
+      )}
     </div>
   )
 }

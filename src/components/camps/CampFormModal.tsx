@@ -90,7 +90,6 @@ export function CampFormModal({ schoolId, existingCamp, onClose }: Props) {
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder='לדוגמה: קיץ תשפ"ז'
               className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
             />
           </label>
