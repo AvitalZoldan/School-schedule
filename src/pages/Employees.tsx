@@ -10,6 +10,7 @@ import {
   type EmployeeFormInput,
 } from '../hooks/useEmployees'
 import { useEmployeeCategories } from '../hooks/useEmployeeCategories'
+import { useEmployeeScheduledHours } from '../hooks/useEmployeeScheduledHours'
 import { useLeaves, useCancelLeave, type LeaveWithEmployee } from '../hooks/useLeaves'
 import { toISODate } from '../lib/dateUtils'
 import { EMPLOYEE_STATUS_LABELS, type EmployeeStatus } from '../types/schedule'
@@ -18,6 +19,10 @@ import { useConfirm } from '../components/common/ConfirmProvider'
 import { LeaveFormModal } from '../components/employees/LeaveFormModal'
 
 type ModalMode = { kind: 'create' } | { kind: 'edit'; employee: EmployeeWithType }
+
+function formatHours(hours: number): string {
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
+}
 
 const emptyForm: EmployeeFormInput = {
   full_name: '',
@@ -39,6 +44,7 @@ export default function Employees() {
   const { data: employeeTypes } = useEmployeeTypes(schoolId)
   const { data: categories } = useEmployeeCategories(schoolId)
   const { data: leaves } = useLeaves(schoolId)
+  const { data: scheduledHoursByEmployeeId } = useEmployeeScheduledHours(schoolId)
   const createEmployee = useCreateEmployee()
   const updateEmployee = useUpdateEmployee()
   const cancelLeave = useCancelLeave()
@@ -238,6 +244,7 @@ export default function Employees() {
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">תפקיד</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">קטגוריה</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">סטטוס</th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">שעות עבודה שבועיות</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">טלפון</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">מייל</th>
               <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">הערות</th>
@@ -247,7 +254,7 @@ export default function Employees() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="px-3 py-4 text-center text-ink-soft">טוען…</td>
+                <td colSpan={10} className="px-3 py-4 text-center text-ink-soft">טוען…</td>
               </tr>
             ) : visibleEmployees.length > 0 ? (
               visibleEmployees.map((emp) => (
@@ -275,6 +282,11 @@ export default function Employees() {
                     )}
                   </td>
                   <td className="border-t border-line px-3 py-2">{EMPLOYEE_STATUS_LABELS[emp.status]}</td>
+                  <td className="border-t border-line px-3 py-2">
+                    {(scheduledHoursByEmployeeId?.get(emp.id) ?? 0) > 0
+                      ? `${formatHours(scheduledHoursByEmployeeId!.get(emp.id)!)} שעות`
+                      : '—'}
+                  </td>
                   <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.phone ?? '—'}</td>
                   <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.email ?? '—'}</td>
                   <td className="max-w-[200px] truncate border-t border-line px-3 py-2 text-ink-soft" title={emp.notes ?? undefined}>
@@ -322,7 +334,7 @@ export default function Employees() {
               ))
             ) : (
               <tr>
-                <td colSpan={9} className="px-3 py-4 text-center text-ink-soft">
+                <td colSpan={10} className="px-3 py-4 text-center text-ink-soft">
                   {nameSearch.trim() || phoneSearch.trim()
                     ? 'אין עובדת התואמת את החיפוש.'
                     : 'אין עדיין עובדות מוגדרות.'}
