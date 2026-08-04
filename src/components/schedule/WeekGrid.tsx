@@ -122,10 +122,6 @@ export function WeekGrid({ slots, employees, templateId, conflictSlots, classNam
           })}
         </tbody>
       </table>
-      <div className="border-t border-line px-3 py-2.5 text-[12px] text-ink-soft">
-        לחיצה על כל תא פותחת בחירת עובדת קבועה, סימון "חור ריק", או שינוי רמת קריטיות. שינויים
-        נשמרים מיידית.
-      </div>
     </div>
   )
 }

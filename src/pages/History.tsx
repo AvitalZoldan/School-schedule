@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useAuditLog } from '../hooks/useAuditLog'
 import { useEmployeesOverview } from '../hooks/useEmployees'
@@ -6,6 +6,12 @@ import { useClassesOverview } from '../hooks/useClasses'
 import { DAY_PART_LABELS, type DayPart } from '../types/schedule'
 import type { AuditLogWithUser } from '../types/audit'
 import { addDays, parseISODate, toGregorianDateLabel, toISODate, toLocalTimeLabel } from '../lib/dateUtils'
+import { ColumnFilter } from '../components/common/ColumnFilter'
+import { Pagination } from '../components/common/Pagination'
+import { useColumnFilters, matchesOption, matchesText } from '../hooks/useColumnFilters'
+import { usePagination } from '../hooks/usePagination'
+
+const PAGE_SIZE = 25
 
 const ACTION_LABELS: Record<AuditLogWithUser['action'], string> = {
   create: 'יצירה',
@@ -23,7 +29,6 @@ interface HistoryRow {
   entry: AuditLogWithUser
   date: string
   classId: number | null
-  employeeIds: number[]
   detail: string
 }
 
@@ -47,7 +52,6 @@ function buildRow(entry: AuditLogWithUser, employeeName: (id: number | null | un
       entry,
       date: row.assignment_date,
       classId: row.class_id_snapshot ?? null,
-      employeeIds: [oldEmployeeId, newEmployeeId].filter((id): id is number => id != null),
       detail,
     }
   }
@@ -67,86 +71,17 @@ function buildRow(entry: AuditLogWithUser, employeeName: (id: number | null | un
     entry,
     date: row.absence_date,
     classId: null,
-    employeeIds: row.employee_id != null ? [row.employee_id] : [],
     detail,
   }
 }
 
-// הסינון בפועל (ה-onChange כלפי ההורה) מופעל רק בבחירה מהרשימה — לא תוך כדי הקלדה. ה-draft
-// המקומי משמש רק כדי לסנן את רשימת ההצעות המוצגת ולהציג את מה שהמשתמש מקליד.
-function FilterCombobox({
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  value: string
-  onChange: (value: string) => void
-  options: string[]
-  placeholder: string
-}) {
-  const [draft, setDraft] = useState(value)
-  const [open, setOpen] = useState(false)
-  const blurTimeout = useRef<ReturnType<typeof setTimeout>>()
-
-  useEffect(() => setDraft(value), [value])
-
-  const filtered = useMemo(() => {
-    const text = draft.trim().toLowerCase()
-    const list = text ? options.filter((o) => o.toLowerCase().includes(text)) : options
-    return list.slice(0, 20)
-  }, [draft, options])
-
-  return (
-    <div className="relative w-44">
-      <input
-        type="text"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => {
-          blurTimeout.current = setTimeout(() => {
-            setOpen(false)
-            if (draft.trim() === '') {
-              onChange('')
-            } else {
-              setDraft(value)
-            }
-          }, 120)
-        }}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
-      />
-      {open && filtered.length > 0 && (
-        <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-line bg-white py-1 shadow-lg">
-          {filtered.map((option) => (
-            <li
-              key={option}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                if (blurTimeout.current) clearTimeout(blurTimeout.current)
-                setDraft(option)
-                onChange(option)
-                setOpen(false)
-              }}
-              className="cursor-pointer px-3 py-1.5 text-[13px] hover:bg-[#f2f0ea]"
-            >
-              {option}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
+const FILTER_COLUMNS = ['date', 'class', 'action', 'detail', 'user'] as const
 
 export default function History() {
   const schoolId = useCurrentSchoolId()
   const [dateFrom, setDateFrom] = useState(() => toISODate(addDays(new Date(), -30)))
   const [dateTo, setDateTo] = useState(() => toISODate(new Date()))
-  const [classFilter, setClassFilter] = useState('')
-  const [employeeFilter, setEmployeeFilter] = useState('')
-  const [userFilter, setUserFilter] = useState('')
+  const { filters } = useColumnFilters(FILTER_COLUMNS)
 
   const { data: entries, isLoading } = useAuditLog(schoolId, dateFrom, dateTo)
   const { data: employees } = useEmployeesOverview(schoolId)
@@ -161,31 +96,39 @@ export default function History() {
 
   const rows = useMemo(() => (entries ?? []).map((entry) => buildRow(entry, employeeName)), [entries, employeesById])
 
-  const users = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const entry of entries ?? []) {
-      if (entry.changed_by) map.set(entry.changed_by, entry.changed_by_profile?.full_name ?? 'לא ידוע')
-    }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], 'he'))
-  }, [entries])
+  const classOptions = useMemo(
+    () =>
+      (classes ?? [])
+        .filter((c) => c.active)
+        .sort((a, b) => a.name.localeCompare(b.name, 'he'))
+        .map((c) => ({ value: String(c.id), label: c.name })),
+    [classes],
+  )
+  const actionOptions = useMemo(
+    () => (Object.entries(ACTION_LABELS) as [AuditLogWithUser['action'], string][]).map(([value, label]) => ({ value, label })),
+    [],
+  )
 
   const filteredRows = useMemo(() => {
-    const classText = classFilter.trim().toLowerCase()
-    const employeeText = employeeFilter.trim().toLowerCase()
-    const userText = userFilter.trim().toLowerCase()
     return rows.filter((row) => {
-      if (classText && !className(row.classId).toLowerCase().includes(classText)) return false
-      if (employeeText && !row.employeeIds.some((id) => employeeName(id).toLowerCase().includes(employeeText))) return false
-      if (userText && !(row.entry.changed_by_profile?.full_name ?? 'לא ידוע').toLowerCase().includes(userText)) return false
+      if (!matchesText(filters.date.value, toGregorianDateLabel(parseISODate(row.date)))) return false
+
+      const classValue = row.classId ? String(row.classId) : ''
+      if (!matchesOption(filters.class.value, classValue)) return false
+      if (!matchesText(filters.class.value, className(row.classId))) return false
+
+      if (!matchesOption(filters.action.value, row.entry.action)) return false
+      if (!matchesText(filters.action.value, ACTION_LABELS[row.entry.action])) return false
+
+      if (!matchesText(filters.detail.value, row.detail)) return false
+
+      if (!matchesText(filters.user.value, row.entry.changed_by_profile?.full_name ?? 'לא ידוע')) return false
+
       return true
     })
-  }, [rows, classFilter, employeeFilter, userFilter, employeesById, classesById])
+  }, [rows, filters])
 
-  const sortedClasses = useMemo(() => [...(classes ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'he')), [classes])
-  const sortedEmployees = useMemo(
-    () => [...(employees ?? [])].sort((a, b) => a.full_name.localeCompare(b.full_name, 'he')),
-    [employees],
-  )
+  const { page, pageCount, setPage, pageItems: pagedRows } = usePagination(filteredRows, PAGE_SIZE)
 
   return (
     <div>
@@ -223,48 +166,46 @@ export default function History() {
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
-        <FilterCombobox
-          value={classFilter}
-          onChange={setClassFilter}
-          options={sortedClasses.map((c) => c.name)}
-          placeholder="סינון לפי כיתה…"
-        />
-        <FilterCombobox
-          value={employeeFilter}
-          onChange={setEmployeeFilter}
-          options={sortedEmployees.map((e) => e.full_name)}
-          placeholder="סינון לפי עובדת…"
-        />
-        <FilterCombobox
-          value={userFilter}
-          onChange={setUserFilter}
-          options={users.map(([, name]) => name)}
-          placeholder="סינון לפי משתמש…"
-        />
-      </div>
-
-      {isLoading ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">טוען…</div>
-      ) : filteredRows.length === 0 ? (
-        <div className="rounded-xl border border-line bg-panel p-[18px] text-center text-ink-soft">
-          אין שינויים רשומים בטווח/סינון שנבחרו.
-        </div>
-      ) : (
-        <div className="overflow-x-auto overflow-hidden rounded-xl border border-line bg-panel">
-          <table className="w-full min-w-[700px] border-collapse text-[13px]">
-            <thead>
-              <tr className="bg-[#f7f6f2] text-right text-[11.5px] text-ink-soft">
-                <th className="border-b border-line px-3 py-2 font-medium">תאריך</th>
-                <th className="border-b border-line px-3 py-2 font-medium">שעה</th>
-                <th className="border-b border-line px-3 py-2 font-medium">כיתה</th>
-                <th className="border-b border-line px-3 py-2 font-medium">פעולה</th>
-                <th className="border-b border-line px-3 py-2 font-medium">פרטים</th>
-                <th className="border-b border-line px-3 py-2 font-medium">משתמש</th>
+      <div className="overflow-x-auto overflow-hidden rounded-xl border border-line bg-panel">
+        <table className="w-full min-w-[700px] border-collapse text-[13px]">
+          <thead>
+            <tr className="bg-[#f7f6f2] text-right text-[11.5px] text-ink-soft">
+              <th className="border-b border-line px-3 py-2 font-medium">
+                תאריך
+                <ColumnFilter filter={filters.date} />
+              </th>
+              <th className="border-b border-line px-3 py-2 font-medium">שעה</th>
+              <th className="border-b border-line px-3 py-2 font-medium">
+                כיתה
+                <ColumnFilter filter={filters.class} options={classOptions} />
+              </th>
+              <th className="border-b border-line px-3 py-2 font-medium">
+                פעולה
+                <ColumnFilter filter={filters.action} options={actionOptions} />
+              </th>
+              <th className="border-b border-line px-3 py-2 font-medium">
+                פרטים
+                <ColumnFilter filter={filters.detail} />
+              </th>
+              <th className="border-b border-line px-3 py-2 font-medium">
+                משתמש
+                <ColumnFilter filter={filters.user} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-4 text-center text-ink-soft">טוען…</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((row) => (
+            ) : filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-4 text-center text-ink-soft">
+                  אין שינויים רשומים בטווח/סינון שנבחרו.
+                </td>
+              </tr>
+            ) : (
+              pagedRows.map((row) => (
                 <tr key={row.entry.id} className="border-b border-line last:border-0">
                   <td className="whitespace-nowrap px-3 py-2">{toGregorianDateLabel(parseISODate(row.date))}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right" dir="ltr">
@@ -279,11 +220,18 @@ export default function History() {
                   <td className="px-3 py-2">{row.detail}</td>
                   <td className="whitespace-nowrap px-3 py-2">{row.entry.changed_by_profile?.full_name ?? 'לא ידוע'}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))
+            )}
+          </tbody>
+        </table>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          totalItems={filteredRows.length}
+          pageSize={PAGE_SIZE}
+        />
+      </div>
     </div>
   )
 }

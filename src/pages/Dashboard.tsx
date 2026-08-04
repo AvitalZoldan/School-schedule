@@ -6,7 +6,7 @@ import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useDailyAuxiliaryAssignments, useAllAuxiliaryRosters } from '../hooks/useAuxiliarySystems'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
-import { useHolidays } from '../hooks/useHolidays'
+import { useHolidays, holidayDisablesDayPart } from '../hooks/useHolidays'
 import { addDays, formatDisplayDate, parseISODate, systemWeekday, toISODate, weekDates } from '../lib/dateUtils'
 import {
   auxiliaryOccupancy,
@@ -88,8 +88,9 @@ export default function Dashboard() {
   const { data: dailyAuxiliaryAssignments } = useDailyAuxiliaryAssignments(schoolId, startDate, endDate)
 
   // ימי חופש נקבעים במסך "ניהול" (Management.tsx) — כאן רק קוראים אותם כדי לנטרל תאים בתאריך כזה
+  // (יום חופש מלא מנטרל את שני חלקי-היום, "יום קצר" מנטרל רק את החלק שלא פעיל בו)
   const { data: holidays } = useHolidays(schoolId, startDate, endDate)
-  const holidaySet = useMemo(() => new Set((holidays ?? []).map((h) => h.holiday_date)), [holidays])
+  const holidaysByDate = useMemo(() => new Map((holidays ?? []).map((h) => [h.holiday_date, h])), [holidays])
 
   const visibleClasses = useMemo(
     () =>
@@ -303,7 +304,10 @@ export default function Dashboard() {
                           schoolId={schoolId!}
                           createdBy={profile?.id ?? null}
                           dateDisplayMode={dateDisplayMode}
-                          isCellDisabled={(date) => holidaySet.has(date)}
+                          isCellDisabled={(date, dayPart) => {
+                            const holiday = holidaysByDate.get(date)
+                            return !!holiday && holidayDisablesDayPart(holiday, dayPart)
+                          }}
                         />
                       </div>
                     ))}

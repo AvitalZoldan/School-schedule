@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Pencil, Calendar, CalendarPlus, Trash2, RotateCcw, type LucideIcon } from 'lucide-react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import {
   useEmployeesOverview,
@@ -17,11 +18,31 @@ import { EMPLOYEE_STATUS_LABELS, type EmployeeStatus } from '../types/schedule'
 import { useAuth } from '../lib/AuthContext'
 import { useConfirm } from '../components/common/ConfirmProvider'
 import { LeaveFormModal } from '../components/employees/LeaveFormModal'
+import { ImportEmployeesModal } from '../components/employees/ImportEmployeesModal'
+import { ColumnFilter } from '../components/common/ColumnFilter'
+import { Pagination } from '../components/common/Pagination'
+import { useColumnFilters, matchesOption, matchesText, matchesNumberRange } from '../hooks/useColumnFilters'
+import { usePagination } from '../hooks/usePagination'
+
+const PAGE_SIZE = 20
 
 type ModalMode = { kind: 'create' } | { kind: 'edit'; employee: EmployeeWithType }
 
+const FILTER_COLUMNS = ['name', 'role', 'category', 'status', 'hours', 'phone', 'email', 'notes'] as const
+
 function formatHours(hours: number): string {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
+}
+
+// אייקון לוח שנה עם תג פעולה קטן בפינה (עיפרון לעריכת חופשה, פח למחיקתה) — כדי להבחין
+// חזותית בין פעולות על חופשה קיימת לבין שאר כפתורי העריכה/מחיקה הרגילים באפליקציה
+function CalendarBadgeIcon({ badge: Badge }: { badge: LucideIcon }) {
+  return (
+    <span className="relative inline-flex">
+      <Calendar size={14} />
+      <Badge size={9} className="absolute -bottom-1 -left-1 rounded-full bg-white" strokeWidth={2.5} />
+    </span>
+  )
 }
 
 const emptyForm: EmployeeFormInput = {
@@ -55,10 +76,25 @@ export default function Employees() {
   const [form, setForm] = useState<EmployeeFormInput>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [leaveModalEmployee, setLeaveModalEmployee] = useState<EmployeeWithType | null>(null)
-  const [nameSearch, setNameSearch] = useState('')
-  const [phoneSearch, setPhoneSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<number | 'all'>('all')
+  const [showImportModal, setShowImportModal] = useState(false)
+  const { filters, isAnyActive: isFiltered } = useColumnFilters(FILTER_COLUMNS)
   const [searchParams, setSearchParams] = useSearchParams()
+
+  const roleOptions = useMemo(
+    () => (employeeTypes ?? []).map((t) => ({ value: String(t.id), label: t.label })),
+    [employeeTypes],
+  )
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: 'ללא קטגוריה' },
+      ...(categories ?? []).map((c) => ({ value: String(c.id), label: c.name, color: c.color })),
+    ],
+    [categories],
+  )
+  const statusOptions = useMemo(
+    () => Object.entries(EMPLOYEE_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+    [],
+  )
 
   // עבור כל עובדת קבועה, החופשה הפעילה/עתידית האחרונה שלה (אם יש) — לכפתור "ניהול/הוספת חופשה" (3.7)
   const currentLeaveByEmployeeId = useMemo(() => {
@@ -72,18 +108,41 @@ export default function Employees() {
     return map
   }, [leaves])
 
-  const visibleEmployees = useMemo(() => {
-    const nameQuery = nameSearch.trim().toLowerCase()
-    const phoneQuery = phoneSearch.trim().toLowerCase()
-    return (employees ?? []).filter(
-      (e) =>
-        (e.active || showInactive) &&
-        (!nameQuery || e.full_name.toLowerCase().includes(nameQuery)) &&
-        (!phoneQuery || (e.phone ?? '').toLowerCase().includes(phoneQuery)) &&
-        (categoryFilter === 'all' || e.category?.id === categoryFilter),
+  // התראה (לא חוסמת) על שם שכבר קיים בבית הספר — בין אם עובדת פעילה או לא, לא כולל את
+  // העובדת הנוכחית עצמה כשעורכים
+  const duplicateNameWarning = useMemo(() => {
+    const trimmed = form.full_name.trim().toLowerCase()
+    if (!trimmed) return false
+    return (employees ?? []).some(
+      (e) => e.full_name.trim().toLowerCase() === trimmed && (modal?.kind !== 'edit' || e.id !== modal.employee.id),
     )
-  }, [employees, showInactive, nameSearch, phoneSearch, categoryFilter])
+  }, [employees, form.full_name, modal])
+
+  const visibleEmployees = useMemo(() => {
+    return (employees ?? []).filter((e) => {
+      if (!(e.active || showInactive)) return false
+      if (!matchesText(filters.name.value, e.full_name)) return false
+
+      if (!matchesOption(filters.role.value, String(e.employee_type_id))) return false
+      if (!matchesText(filters.role.value, e.employee_type?.label ?? '')) return false
+
+      if (!matchesOption(filters.category.value, e.category ? String(e.category.id) : '')) return false
+      if (!matchesText(filters.category.value, e.category?.name ?? '')) return false
+
+      if (!matchesOption(filters.status.value, e.status)) return false
+      if (!matchesText(filters.status.value, EMPLOYEE_STATUS_LABELS[e.status])) return false
+
+      if (!matchesNumberRange(filters.hours.value, scheduledHoursByEmployeeId?.get(e.id) ?? 0)) return false
+
+      if (!matchesText(filters.phone.value, e.phone ?? '')) return false
+      if (!matchesText(filters.email.value, e.email ?? '')) return false
+      if (!matchesText(filters.notes.value, e.notes ?? '')) return false
+
+      return true
+    })
+  }, [employees, showInactive, filters, scheduledHoursByEmployeeId])
   const inactiveCount = (employees ?? []).filter((e) => !e.active).length
+  const { page, pageCount, setPage, pageItems: pagedEmployees } = usePagination(visibleEmployees, PAGE_SIZE)
 
   // הגעה ממקום אחר באפליקציה דרך EmployeeHoverCard ("מעבר לפרטי עובדת") — /staff?search=<שם>.
   // מזריקה את השם לשדה חיפוש השם כאן, כדי שהטבלה תסונן ישירות לשורה שלה. מנקה את פרמטר ה-query
@@ -91,8 +150,9 @@ export default function Employees() {
   useEffect(() => {
     const target = searchParams.get('search')
     if (!target) return
-    setNameSearch(target)
+    filters.name.setText(target)
     setSearchParams({}, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams])
 
   function openCreateModal() {
@@ -127,6 +187,10 @@ export default function Employees() {
     }
     if (!form.employee_type_id) {
       setFormError('יש לבחור תפקיד בסיס')
+      return
+    }
+    if (duplicateNameWarning) {
+      setFormError(`כבר קיימת עובדת בשם "${trimmedName}" — לא ניתן להוסיף שם כפול`)
       return
     }
 
@@ -184,46 +248,26 @@ export default function Employees() {
           <h1 className="text-xl font-bold">רשימת עובדות</h1>
         </div>
         {canEdit && (
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 print:hidden"
-          >
-            הוספת עובדת +
-          </button>
+          <div className="flex gap-2 print:hidden">
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] hover:bg-[#f2f0ea]"
+            >
+              ייבוא מקובץ
+            </button>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              הוספת עובדת +
+            </button>
+          </div>
         )}
       </div>
 
-      <div className="mb-4 flex items-center justify-between gap-2 print:hidden">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={nameSearch}
-            onChange={(e) => setNameSearch(e.target.value)}
-            placeholder="חיפוש לפי שם…"
-            className="w-48 rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
-          />
-          <input
-            type="text"
-            value={phoneSearch}
-            onChange={(e) => setPhoneSearch(e.target.value)}
-            placeholder="...חיפוש לפי טלפון"
-            dir="ltr"
-            className="w-48 rounded-lg border border-line bg-white px-3 py-2 text-right text-[13px] outline-none focus:border-accent"
-          />
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
-          >
-            <option value="all">כל הקטגוריות</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="mb-4 flex items-center justify-end gap-2 print:hidden">
         {inactiveCount > 0 && (
           <label className="flex items-center gap-1.5 text-[12px] text-ink-soft">
             <input
@@ -240,14 +284,38 @@ export default function Employees() {
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">שם</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">תפקיד</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">קטגוריה</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">סטטוס</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">שעות עבודה שבועיות</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">טלפון</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">מייל</th>
-              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">הערות</th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                שם
+                <ColumnFilter filter={filters.name} textPlaceholder="חיפוש לפי שם…" />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                תפקיד
+                <ColumnFilter filter={filters.role} options={roleOptions} />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                קטגוריה
+                <ColumnFilter filter={filters.category} options={categoryOptions} />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                סטטוס
+                <ColumnFilter filter={filters.status} options={statusOptions} />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                שעות שבועיות
+                <ColumnFilter filter={filters.hours} numeric />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                טלפון
+                <ColumnFilter filter={filters.phone} />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                מייל
+                <ColumnFilter filter={filters.email} />
+              </th>
+              <th className="border-b border-line px-3 py-2.5 text-right text-[12.5px] text-ink-soft">
+                הערות
+                <ColumnFilter filter={filters.notes} />
+              </th>
               <th className="border-b border-line px-3 py-2.5" />
             </tr>
           </thead>
@@ -257,9 +325,9 @@ export default function Employees() {
                 <td colSpan={10} className="px-3 py-4 text-center text-ink-soft">טוען…</td>
               </tr>
             ) : visibleEmployees.length > 0 ? (
-              visibleEmployees.map((emp) => (
-                <tr key={emp.id} className={emp.active ? '' : 'opacity-50'}>
-                  <td className="border-t border-line px-3 py-2 font-medium">
+              pagedEmployees.map((emp) => (
+                <tr key={emp.id}>
+                  <td className={`border-t border-line px-3 py-2 font-medium ${emp.active ? '' : 'opacity-50'}`}>
                     {emp.full_name}
                     {!emp.active && (
                       <span className="mr-1.5 rounded-full bg-[#f2f0ea] px-2 py-0.5 text-[11px] text-[#999]">
@@ -267,8 +335,10 @@ export default function Employees() {
                       </span>
                     )}
                   </td>
-                  <td className="border-t border-line px-3 py-2">{emp.employee_type?.label ?? '—'}</td>
-                  <td className="border-t border-line px-3 py-2">
+                  <td className={`border-t border-line px-3 py-2 ${emp.active ? '' : 'opacity-50'}`}>
+                    {emp.employee_type?.label ?? '—'}
+                  </td>
+                  <td className={`border-t border-line px-3 py-2 ${emp.active ? '' : 'opacity-50'}`}>
                     {emp.category ? (
                       <span className="flex items-center gap-1.5">
                         <span
@@ -281,51 +351,78 @@ export default function Employees() {
                       '—'
                     )}
                   </td>
-                  <td className="border-t border-line px-3 py-2">{EMPLOYEE_STATUS_LABELS[emp.status]}</td>
-                  <td className="border-t border-line px-3 py-2">
+                  <td className={`border-t border-line px-3 py-2 ${emp.active ? '' : 'opacity-50'}`}>
+                    {EMPLOYEE_STATUS_LABELS[emp.status]}
+                  </td>
+                  <td className={`border-t border-line px-3 py-2 ${emp.active ? '' : 'opacity-50'}`}>
                     {(scheduledHoursByEmployeeId?.get(emp.id) ?? 0) > 0
-                      ? `${formatHours(scheduledHoursByEmployeeId!.get(emp.id)!)} שעות`
+                      ? formatHours(scheduledHoursByEmployeeId!.get(emp.id)!)
                       : '—'}
                   </td>
-                  <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.phone ?? '—'}</td>
-                  <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{emp.email ?? '—'}</td>
-                  <td className="max-w-[200px] truncate border-t border-line px-3 py-2 text-ink-soft" title={emp.notes ?? undefined}>
+                  <td
+                    className={`border-t border-line px-3 py-2 text-right ${emp.active ? '' : 'opacity-50'}`}
+                    dir="ltr"
+                  >
+                    {emp.phone ?? '—'}
+                  </td>
+                  <td
+                    className={`border-t border-line px-3 py-2 text-right ${emp.active ? '' : 'opacity-50'}`}
+                    dir="ltr"
+                  >
+                    {emp.email ?? '—'}
+                  </td>
+                  <td
+                    className={`max-w-[200px] truncate border-t border-line px-3 py-2 text-ink-soft ${emp.active ? '' : 'opacity-50'}`}
+                    title={emp.notes ?? undefined}
+                  >
                     {emp.notes || '—'}
                   </td>
                   <td className="border-t border-line px-3 py-2">
                     {canEdit && (
-                      <div className="flex flex-wrap justify-end gap-1.5 print:hidden">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(emp)}
-                          className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
-                        >
-                          עריכה
-                        </button>
+                      <div className="flex flex-nowrap items-center justify-end gap-1.5 print:hidden">
                         {emp.status === 'permanent' && emp.active && (
                           <button
                             type="button"
                             onClick={() => setLeaveModalEmployee(emp)}
-                            className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                            title={currentLeaveByEmployeeId.has(emp.id) ? 'ניהול חופשה' : 'הוספת חופשה'}
+                            aria-label={currentLeaveByEmployeeId.has(emp.id) ? 'ניהול חופשה' : 'הוספת חופשה'}
+                            className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                           >
-                            {currentLeaveByEmployeeId.has(emp.id) ? 'ניהול חופשה' : 'הוספת חופשה'}
+                            {currentLeaveByEmployeeId.has(emp.id) ? (
+                              <CalendarBadgeIcon badge={Pencil} />
+                            ) : (
+                              <CalendarPlus size={14} />
+                            )}
                           </button>
                         )}
                         {currentLeaveByEmployeeId.has(emp.id) && (
                           <button
                             type="button"
                             onClick={() => handleCancelLeave(currentLeaveByEmployeeId.get(emp.id)!)}
-                            className="rounded-md border border-line px-2.5 py-1 text-[12px] text-danger hover:bg-[#f2f0ea]"
+                            title="ביטול חופשה"
+                            aria-label="ביטול חופשה"
+                            className="rounded-md border border-line p-1.5 text-danger hover:bg-[#f2f0ea]"
                           >
-                            ביטול חופשה
+                            <CalendarBadgeIcon badge={Trash2} />
                           </button>
                         )}
                         <button
                           type="button"
-                          onClick={() => toggleActive(emp)}
-                          className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                          onClick={() => openEditModal(emp)}
+                          title="עריכה"
+                          aria-label="עריכה"
+                          className={`rounded-md border border-line p-1.5 hover:bg-[#f2f0ea] ${emp.active ? '' : 'opacity-50'}`}
                         >
-                          {emp.active ? 'השבתה' : 'שחזור'}
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleActive(emp)}
+                          title={emp.active ? 'השבתה' : 'שחזור'}
+                          aria-label={emp.active ? 'השבתה' : 'שחזור'}
+                          className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
+                        >
+                          {emp.active ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                         </button>
                       </div>
                     )}
@@ -335,14 +432,19 @@ export default function Employees() {
             ) : (
               <tr>
                 <td colSpan={10} className="px-3 py-4 text-center text-ink-soft">
-                  {nameSearch.trim() || phoneSearch.trim()
-                    ? 'אין עובדת התואמת את החיפוש.'
-                    : 'אין עדיין עובדות מוגדרות.'}
+                  {isFiltered ? 'אין עובדת התואמת את הסינון.' : 'אין עדיין עובדות מוגדרות.'}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          totalItems={visibleEmployees.length}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       {modal && (
@@ -360,6 +462,11 @@ export default function Employees() {
                   onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
                   className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
                 />
+                {duplicateNameWarning && (
+                  <div className="mt-1 text-[12px] text-danger">
+                    כבר קיימת עובדת בשם "{form.full_name.trim()}" — לא ניתן להוסיף שם כפול
+                  </div>
+                )}
               </label>
 
               <label className="block">
@@ -462,7 +569,7 @@ export default function Employees() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || duplicateNameWarning}
                   className="flex-1 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {isSaving ? 'שמירה...' : 'שמירה'}
@@ -480,6 +587,15 @@ export default function Employees() {
           existingLeave={currentLeaveByEmployeeId.get(leaveModalEmployee.id)}
           createdBy={profile?.id ?? null}
           onClose={() => setLeaveModalEmployee(null)}
+        />
+      )}
+
+      {showImportModal && schoolId && (
+        <ImportEmployeesModal
+          schoolId={schoolId}
+          employeeTypes={employeeTypes ?? []}
+          existingNames={(employees ?? []).map((e) => e.full_name)}
+          onClose={() => setShowImportModal(false)}
         />
       )}
     </div>

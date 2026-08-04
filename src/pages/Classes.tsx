@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Ban, RotateCcw } from 'lucide-react'
+import { Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import {
   useClassesOverview,
@@ -172,8 +172,8 @@ export default function Classes() {
               </tr>
             ) : visibleClasses.length > 0 ? (
               visibleClasses.map((c) => (
-                <tr key={c.id} className={c.active ? '' : 'opacity-50'}>
-                  <td className="border-t border-line px-3 py-2 font-medium">
+                <tr key={c.id}>
+                  <td className={`border-t border-line px-3 py-2 font-medium ${c.active ? '' : 'opacity-50'}`}>
                     {c.name}
                     {!c.active && (
                       <span className="mr-1.5 rounded-full bg-[#f2f0ea] px-2 py-0.5 text-[11px] text-[#999]">
@@ -181,9 +181,9 @@ export default function Classes() {
                       </span>
                     )}
                   </td>
-                  <td className="border-t border-line px-3 py-2">{c.totalSlots}</td>
-                  <td className="border-t border-line px-3 py-2">{c.emptySlots}</td>
-                  <td className="border-t border-line px-3 py-2">
+                  <td className={`border-t border-line px-3 py-2 ${c.active ? '' : 'opacity-50'}`}>{c.totalSlots}</td>
+                  <td className={`border-t border-line px-3 py-2 ${c.active ? '' : 'opacity-50'}`}>{c.emptySlots}</td>
+                  <td className={`border-t border-line px-3 py-2 ${c.active ? '' : 'opacity-50'}`}>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_CLASS[c.status]}`}
                     >
@@ -208,7 +208,7 @@ export default function Classes() {
                             onClick={() => openEditModal(c)}
                             title="עריכה"
                             aria-label="עריכה"
-                            className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
+                            className={`rounded-md border border-line p-1.5 hover:bg-[#f2f0ea] ${c.active ? '' : 'opacity-50'}`}
                           >
                             <Pencil size={14} />
                           </button>
@@ -219,7 +219,7 @@ export default function Classes() {
                             aria-label={c.active ? 'השבתה' : 'שחזור'}
                             className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                           >
-                            {c.active ? <Ban size={14} /> : <RotateCcw size={14} />}
+                            {c.active ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                           </button>
                         </>
                       )}

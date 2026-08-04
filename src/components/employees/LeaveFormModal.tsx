@@ -17,9 +17,12 @@ import { DAY_PART_LABELS, WEEKDAY_LABELS, type DayPart } from '../../types/sched
 import { SubstituteCombobox } from '../dashboard/SubstituteCombobox'
 import { useConfirm } from '../common/ConfirmProvider'
 import { EmployeeHoverCard } from '../common/EmployeeHoverCard'
+import { Pagination } from '../common/Pagination'
+import { usePagination } from '../../hooks/usePagination'
 import { buildTransferConfirmMessage } from '../../lib/conflictMessages'
 
 const REMINDER_PRESETS = [3, 7, 14]
+const DATE_GROUPS_PAGE_SIZE = 5
 
 interface Props {
   schoolId: number
@@ -181,6 +184,13 @@ export function LeaveFormModal({ schoolId, employee, existingLeave, createdBy, o
     })
   }
 
+  const {
+    page: dateGroupsPage,
+    pageCount: dateGroupsPageCount,
+    setPage: setDateGroupsPage,
+    pageItems: pagedDateGroups,
+  } = usePagination(dateGroups, DATE_GROUPS_PAGE_SIZE)
+
   const isSaving = createLeave.isPending || updateLeave.isPending
 
   async function handleSubmit(e: FormEvent) {
@@ -333,7 +343,7 @@ export function LeaveFormModal({ schoolId, employee, existingLeave, createdBy, o
                       אין לעובדת משבצות קבועות בטווח שנבחר.
                     </div>
                   ) : (
-                    dateGroups.map((group) => (
+                    pagedDateGroups.map((group) => (
                       <div key={group.date} className="rounded-md border border-line px-2.5 py-1.5">
                         <div className="mb-1 text-[12px] font-medium">
                           {WEEKDAY_LABELS[group.weekday]} {toGregorianDateLabel(parseISODate(group.date))}
@@ -383,6 +393,15 @@ export function LeaveFormModal({ schoolId, employee, existingLeave, createdBy, o
                     ))
                   )}
                 </div>
+                {dateGroups.length > 0 && (
+                  <Pagination
+                    page={dateGroupsPage}
+                    pageCount={dateGroupsPageCount}
+                    onPageChange={setDateGroupsPage}
+                    totalItems={dateGroups.length}
+                    pageSize={DATE_GROUPS_PAGE_SIZE}
+                  />
+                )}
               </>
             )}
           </div>

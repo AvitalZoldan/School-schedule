@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Trash2, RotateCcw } from 'lucide-react'
 import { useSchools, useCreateSchool, useUpdateSchool } from '../hooks/useSchools'
 import { useSystemSettings, useUpdateSystemSettings } from '../hooks/useSystemSettings'
 import type { SchoolRow } from '../types/schedule'
@@ -204,8 +205,10 @@ function SchoolsPanel() {
               </tr>
             ) : schools && schools.length > 0 ? (
               schools.map((school) => (
-                <tr key={school.id} className={school.active ? '' : 'opacity-50'}>
-                  <td className="border-t border-line px-3 py-2 font-medium">{school.name}</td>
+                <tr key={school.id}>
+                  <td className={`border-t border-line px-3 py-2 font-medium ${school.active ? '' : 'opacity-50'}`}>
+                    {school.name}
+                  </td>
                   <td className="border-t border-line px-3 py-2">
                     {school.active ? (
                       <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">
@@ -217,22 +220,26 @@ function SchoolsPanel() {
                       </span>
                     )}
                   </td>
-                  <td className="border-t border-line px-3 py-2 text-center">{school.max_full_access_users}</td>
+                  <td className={`border-t border-line px-3 py-2 text-center ${school.active ? '' : 'opacity-50'}`}>
+                    {school.max_full_access_users}
+                  </td>
                   <td className="border-t border-line px-3 py-2">
                     <div className="flex justify-end gap-2 print:hidden">
                       <button
                         type="button"
                         onClick={() => openLimitModal(school)}
-                        className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                        className={`rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea] ${school.active ? '' : 'opacity-50'}`}
                       >
                         עריכת מגבלה
                       </button>
                       <button
                         type="button"
                         onClick={() => toggleActive(school)}
-                        className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                        title={school.active ? 'השבתה' : 'שחזור'}
+                        aria-label={school.active ? 'השבתה' : 'שחזור'}
+                        className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                       >
-                        {school.active ? 'השבתה' : 'שחזור'}
+                        {school.active ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                       </button>
                     </div>
                   </td>

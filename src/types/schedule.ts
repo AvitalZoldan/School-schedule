@@ -81,6 +81,9 @@ export interface ScheduleTemplateRow {
   replaced_template_id: number | null
   created_at: string
   applied_at: string | null
+  // טווח תאריכים אופציונלי — ראו useApplyDraft/useDatedActiveTemplate. NULL = תבנית קבועה
+  valid_from: string | null
+  valid_to: string | null
 }
 
 export interface TemplateSlotRow {

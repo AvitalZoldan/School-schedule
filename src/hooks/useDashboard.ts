@@ -48,7 +48,7 @@ export function useDashboardData(
         classIdList.length > 0
           ? await supabase
               .from('schedule_templates')
-              .select('id, class_id, template_slots(*, employee:employees(id, full_name))')
+              .select('id, class_id, valid_from, valid_to, template_slots(*, employee:employees(id, full_name))')
               .eq('school_id', schoolId!)
               .eq('mode', 'regular')
               .eq('status', 'active')
@@ -56,8 +56,15 @@ export function useDashboardData(
           : { data: [], error: null }
       if (templatesError) throw templatesError
 
+      // לכל כיתה יכולות להיות עד 2 תבניות "active" בו-זמנית: הקבועה (valid_from null) ולכל
+      // היותר תבנית מתוארכת אחת (טווח תאריכים, מהחלת טיוטה מתוארכת — ראו useApplyDraft).
+      // בוחרים את המתוארכת רק אם טווח התצוגה (startDate) נופל בתוכה, אחרת את הקבועה.
       const classes: DashboardClassData[] = (classesData ?? []).map((c) => {
-        const t = (templatesData ?? []).find((t: any) => t.class_id === c.id)
+        const templatesForClass = (templatesData ?? []).filter((t: any) => t.class_id === c.id)
+        const dated = templatesForClass.find(
+          (t: any) => t.valid_from && t.valid_to && startDate! >= t.valid_from && startDate! <= t.valid_to,
+        )
+        const t = dated ?? templatesForClass.find((t: any) => !t.valid_from)
         return {
           classRow: c as ClassRow,
           templateId: t?.id ?? null,

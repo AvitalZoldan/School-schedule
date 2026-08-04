@@ -6,6 +6,7 @@ import {
   useActiveTemplate,
   useApplyDraft,
   useCreateDraft,
+  useDatedActiveTemplate,
   useDiscardDraft,
   useDraftTemplate,
   useTemplateSlots,
@@ -13,6 +14,7 @@ import {
 } from '../hooks/useSchedule'
 import { useConfirm } from '../components/common/ConfirmProvider'
 import { WeekGrid } from '../components/schedule/WeekGrid'
+import { SegmentedToggle } from '../components/common/SegmentedToggle'
 
 export default function Draft() {
   const schoolId = useCurrentSchoolId()
@@ -30,10 +32,16 @@ export default function Draft() {
   const [applySuccessMessage, setApplySuccessMessage] = useState<string | null>(null)
 
   const { data: activeTemplate, isLoading: activeLoading } = useActiveTemplate(classId, 'regular')
+  const { data: datedActiveTemplate } = useDatedActiveTemplate(classId, 'regular')
   const { data: draftTemplate, isLoading: draftLoading } = useDraftTemplate(classId, 'regular')
   const { data: draftSlots, isLoading: slotsLoading } = useTemplateSlots(draftTemplate?.id)
   const { data: conflictSlots } = useSchoolSlotsForConflictCheck(schoolId, 'regular', 'draft')
   const classNameById = useMemo(() => new Map((classes ?? []).map((c) => [c.id, c.name])), [classes])
+
+  const [applyMode, setApplyMode] = useState<'full' | 'dated'>('full')
+  const [validFrom, setValidFrom] = useState('')
+  const [validTo, setValidTo] = useState('')
+  const [dateRangeError, setDateRangeError] = useState<string | null>(null)
 
   const createDraft = useCreateDraft()
   const discardDraft = useDiscardDraft()
@@ -50,25 +58,47 @@ export default function Draft() {
 
   async function handleApply() {
     if (!draftTemplate || !classId) return
-    if (
-      !(await confirm({
-        message: 'להחיל את הטיוטה? היא תחליף מיידית את השיבוץ הפעיל של הכיתה, ואי אפשר לבטל פעולה זו.',
-        confirmLabel: 'החילי טיוטה',
-      }))
-    )
-      return
+    setDateRangeError(null)
+
+    const isDated = applyMode === 'dated'
+    if (isDated) {
+      if (!validFrom || !validTo) {
+        setDateRangeError('יש למלא תאריך התחלה ותאריך סיום')
+        return
+      }
+      if (validTo < validFrom) {
+        setDateRangeError('תאריך הסיום חייב להיות אחרי תאריך ההתחלה')
+        return
+      }
+    }
+
+    const confirmMessage = isDated
+      ? `להחיל את הטיוטה רק בטווח ${validFrom} עד ${validTo}? מחוץ לטווח הזה ימשיך להופיע השיבוץ הקבוע כרגיל.${
+          datedActiveTemplate ? ' שימי לב: יש כבר טווח מתוארך פעיל לכיתה זו — הוא יוחלף בטווח החדש.' : ''
+        }`
+      : 'להחיל את הטיוטה? היא תחליף מיידית וללא הגבלת זמן את השיבוץ הפעיל של הכיתה, ואי אפשר לבטל פעולה זו.'
+    if (!(await confirm({ message: confirmMessage, confirmLabel: 'החילי טיוטה' }))) return
+
     const className = classes?.find((c) => c.id === classId)?.name
     applyDraft.mutate(
       {
         draftTemplateId: draftTemplate.id,
         previousActiveTemplateId: activeTemplate?.id ?? null,
+        previousDatedTemplateId: datedActiveTemplate?.id ?? null,
         classId,
         mode: 'regular',
+        validFrom: isDated ? validFrom : undefined,
+        validTo: isDated ? validTo : undefined,
       },
       {
         onSuccess: () => {
+          setApplyMode('full')
+          setValidFrom('')
+          setValidTo('')
           setApplySuccessMessage(
-            `הטיוטה הוחלה בהצלחה — השיבוץ הפעיל של כיתה ${className ?? ''} עודכן. הטיוטה אינה קיימת עוד.`,
+            isDated
+              ? `הטיוטה הוחלה בהצלחה — תופיע בשיבוץ של כיתה ${className ?? ''} בין ${validFrom} ל-${validTo} בלבד. הטיוטה אינה קיימת עוד.`
+              : `הטיוטה הוחלה בהצלחה — השיבוץ הפעיל של כיתה ${className ?? ''} עודכן. הטיוטה אינה קיימת עוד.`,
           )
         },
         onError: (error) => alert(`החלת הטיוטה נכשלה: ${error.message}`),
@@ -82,7 +112,7 @@ export default function Draft() {
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">טיוטת שיבוץ</h1>
+        <h1 className="text-xl font-bold">מערכת חלופית</h1>
 
         <select
           className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] print:hidden"
@@ -146,28 +176,78 @@ export default function Draft() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-warn-soft px-3 py-2 print:hidden">
+          <div className="flex flex-col gap-2 rounded-lg border border-line bg-warn-soft px-3 py-2 print:hidden">
             <div className="text-[12.5px] text-warn">
               עריכת טיוטה — השינויים כאן לא משפיעים על השיבוץ הפעיל עד ל"החלת טיוטה".
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={handleDiscard}
-                className="rounded-md border border-line bg-white px-3 py-1.5 text-[12.5px] text-ink-soft hover:bg-[#f2f0ea] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                מחיקת טיוטה
-              </button>
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={handleApply}
-                className="rounded-md bg-accent px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                החלת טיוטה
-              </button>
+
+            {datedActiveTemplate && (
+              <div className="text-[12px] text-ink-soft">
+                לכיתה זו כבר יש טווח תאריכים פעיל: {datedActiveTemplate.valid_from} עד{' '}
+                {datedActiveTemplate.valid_to}. החלה עם תאריכים חדשים תחליף אותו.
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="block">
+                <span className="mb-1 block text-[11.5px] text-ink-soft">סוג ההחלה</span>
+                <SegmentedToggle
+                  value={applyMode}
+                  onChange={(v) => {
+                    setApplyMode(v)
+                    setDateRangeError(null)
+                  }}
+                  options={[
+                    { value: 'full', label: 'החלפה מלאה' },
+                    { value: 'dated', label: 'טווח תאריכים מוגבל' },
+                  ]}
+                />
+              </div>
+
+              {applyMode === 'dated' && (
+                <>
+                  <label className="block">
+                    <span className="mb-1 block text-[11.5px] text-ink-soft">תאריך התחלה</span>
+                    <input
+                      type="date"
+                      value={validFrom}
+                      onChange={(e) => setValidFrom(e.target.value)}
+                      className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-accent"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[11.5px] text-ink-soft">תאריך סיום</span>
+                    <input
+                      type="date"
+                      value={validTo}
+                      onChange={(e) => setValidTo(e.target.value)}
+                      className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-accent"
+                    />
+                  </label>
+                </>
+              )}
+
+              <div className="mr-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={handleDiscard}
+                  className="rounded-md border border-line bg-white px-3 py-1.5 text-[12.5px] text-ink-soft hover:bg-[#f2f0ea] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  מחיקת טיוטה
+                </button>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={handleApply}
+                  className="rounded-md bg-accent px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                 החלפת מערכת
+                </button>
+              </div>
             </div>
+
+            {dateRangeError && <div className="text-[12px] text-danger">{dateRangeError}</div>}
           </div>
 
           {slotsLoading ? (

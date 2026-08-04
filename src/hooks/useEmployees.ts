@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { formatPhone } from '../lib/phone'
 import type { EmployeeCategoryRow, EmployeeRow, EmployeeStatus, EmployeeTypeRow } from '../types/schedule'
 
 const EMPLOYEE_SELECT = '*, employee_type:employee_types(id, code, label), category:employee_categories(id, name, color)'
@@ -83,11 +84,30 @@ export function useCreateEmployee() {
     mutationFn: async ({ schoolId, ...fields }: CreateEmployeeInput) => {
       const { data, error } = await supabase
         .from('employees')
-        .insert({ school_id: schoolId, active: true, ...fields })
+        .insert({ school_id: schoolId, active: true, ...fields, phone: formatPhone(fields.phone) })
         .select()
         .single()
       if (error) throw error
       return data as EmployeeRow
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['employees', variables.schoolId] })
+      queryClient.invalidateQueries({ queryKey: ['employees-overview', variables.schoolId] })
+    },
+  })
+}
+
+// יצירת כמה עובדות בבת אחת (ייבוא מקובץ CSV, ראו ImportEmployeesModal) — הזנה יחידה
+// במקום מילוי אחד-אחד, כל השורות באותה קריאת insert
+export function useBulkCreateEmployees() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ schoolId, rows }: { schoolId: number; rows: EmployeeFormInput[] }) => {
+      if (rows.length === 0) return
+      const { error } = await supabase
+        .from('employees')
+        .insert(rows.map((fields) => ({ school_id: schoolId, active: true, ...fields, phone: formatPhone(fields.phone) })))
+      if (error) throw error
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['employees', variables.schoolId] })
@@ -108,7 +128,8 @@ export function useUpdateEmployee() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ employeeId, schoolId: _schoolId, ...patch }: UpdateEmployeeInput) => {
-      const { error } = await supabase.from('employees').update(patch).eq('id', employeeId)
+      const normalizedPatch = 'phone' in patch ? { ...patch, phone: formatPhone(patch.phone) } : patch
+      const { error } = await supabase.from('employees').update(normalizedPatch).eq('id', employeeId)
       if (error) throw error
     },
     onSuccess: (_data, variables) => {

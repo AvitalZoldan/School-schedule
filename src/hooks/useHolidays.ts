@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import type { DayPart } from '../types/schedule'
 
 export interface HolidayRow {
   id: number
@@ -7,6 +8,15 @@ export interface HolidayRow {
   holiday_date: string
   label: string | null
   created_at: string
+  // חלק-יום שעדיין פעיל בתאריך זה ("יום קצר") — כששניהם false זהו יום חופש מלא (ברירת המחדל
+  // ההיסטורית): גם בוקר וגם צהריים מבוטלים. כשאחד מהם true, רק חלק-היום השני מבוטל.
+  includes_morning: boolean
+  includes_afternoon: boolean
+}
+
+// האם חלק-היום הנתון מבוטל בתאריך הזה (יום חופש מלא, או יום קצר שבו דווקא החלק הזה לא פעיל)
+export function holidayDisablesDayPart(holiday: HolidayRow, dayPart: DayPart): boolean {
+  return dayPart === 'morning' ? !holiday.includes_morning : !holiday.includes_afternoon
 }
 
 // ימי חופש/חג ברמת בית-ספר בטווח תאריכים נתון — ראו migration school_holidays
@@ -51,17 +61,58 @@ export function useSetHoliday() {
       schoolId,
       date,
       label,
+      includesMorning = false,
+      includesAfternoon = false,
     }: {
       schoolId: number
       date: string
       label?: string | null
+      includesMorning?: boolean
+      includesAfternoon?: boolean
     }) => {
       const { error } = await supabase
         .from('school_holidays')
         .upsert(
-          { school_id: schoolId, holiday_date: date, label: label ?? null },
+          {
+            school_id: schoolId,
+            holiday_date: date,
+            label: label ?? null,
+            includes_morning: includesMorning,
+            includes_afternoon: includesAfternoon,
+          },
           { onConflict: 'school_id,holiday_date' },
         )
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] })
+    },
+  })
+}
+
+// הוספת כמה ימי חופש בבת אחת (ייבוא מקובץ, ראו ImportHolidaysModal) — upsert יחיד לכל
+// השורות, כמו useBulkCreateEmployees
+export function useBulkSetHolidays() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      schoolId,
+      rows,
+    }: {
+      schoolId: number
+      rows: { date: string; label: string | null; includesMorning: boolean; includesAfternoon: boolean }[]
+    }) => {
+      if (rows.length === 0) return
+      const { error } = await supabase.from('school_holidays').upsert(
+        rows.map((r) => ({
+          school_id: schoolId,
+          holiday_date: r.date,
+          label: r.label,
+          includes_morning: r.includesMorning,
+          includes_afternoon: r.includesAfternoon,
+        })),
+        { onConflict: 'school_id,holiday_date' },
+      )
       if (error) throw error
     },
     onSuccess: () => {

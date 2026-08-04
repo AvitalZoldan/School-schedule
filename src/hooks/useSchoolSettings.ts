@@ -64,3 +64,22 @@ export function useUpdateSchoolSettings() {
     },
   })
 }
+
+// "התחלת שנה חדשה" (מסך ניהול): מארכבת בטרנזקציה אחת בצד השרת (RPC start_new_year) את כל
+// נתוני השנה החולפת של בית הספר — תבניות שיבוץ, חופשות, קייטנות, ימי חופש, שיבוצים/היעדרויות
+// יומיים, ואת ההיסטוריה. זה סימון archived_at ולא DELETE: הנתונים נשארים ב-DB (נגישים רק דרך
+// גישה ישירה למסד הנתונים) אבל נעלמים מהאפליקציה דרך מדיניות ה-RLS. עובדות, כיתות ותשתית
+// (תפקידים/קטגוריות/הגדרות) לא נפגעות. הרשאה ובדיקת school_id נאכפות בתוך הפונקציה עצמה
+// (SECURITY DEFINER).
+export function useStartNewYear() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (schoolId: number) => {
+      const { error } = await supabase.rpc('start_new_year', { p_school_id: schoolId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries()
+    },
+  })
+}

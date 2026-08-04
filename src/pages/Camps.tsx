@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Pencil } from 'lucide-react'
 import { useCurrentSchoolId } from '../hooks/useSchool'
 import { useCamps } from '../hooks/useCamps'
 import type { CampWithPeriods } from '../types/camps'
@@ -105,9 +106,11 @@ export default function Camps() {
                           <button
                             type="button"
                             onClick={() => setModal({ kind: 'edit', camp })}
-                            className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                            title="עריכה"
+                            aria-label="עריכה"
+                            className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                           >
-                            עריכה
+                            <Pencil size={14} />
                           </button>
                         )}
                         <Link

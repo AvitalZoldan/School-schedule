@@ -99,7 +99,7 @@ export function EmployeeHoverCard({ employee, children, onMarkAbsent }: Props) {
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && markAbsent(e)}
                 className="block cursor-pointer whitespace-nowrap rounded-md bg-danger px-2.5 py-1.5 text-center text-[11.5px] font-semibold text-white transition-opacity hover:opacity-90"
               >
-                לא הגיעה היום
+                ביטול שיבוץ
               </span>
             )}
             <span

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Trash2, RotateCcw } from 'lucide-react'
 import { useAuth } from '../../lib/AuthContext'
 import type { PermissionLevel } from '../../lib/AuthContext'
 import { useSchools } from '../../hooks/useSchools'
@@ -178,8 +179,8 @@ export function UsersPanel({ scope }: Props) {
               </tr>
             ) : profiles && profiles.length > 0 ? (
               profiles.map((user) => (
-                <tr key={user.id} className={user.active ? '' : 'opacity-50'}>
-                  <td className="border-t border-line px-3 py-2 font-medium">
+                <tr key={user.id}>
+                  <td className={`border-t border-line px-3 py-2 font-medium ${user.active ? '' : 'opacity-50'}`}>
                     {user.full_name}
                     {user.is_system_admin && (
                       <span className="mr-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">
@@ -192,9 +193,18 @@ export function UsersPanel({ scope }: Props) {
                       </span>
                     )}
                   </td>
-                  <td className="border-t border-line px-3 py-2 text-right" dir="ltr">{user.email}</td>
-                  {scope === 'system' && <td className="border-t border-line px-3 py-2">{user.school_name}</td>}
-                  <td className="border-t border-line px-3 py-2">
+                  <td
+                    className={`border-t border-line px-3 py-2 text-right ${user.active ? '' : 'opacity-50'}`}
+                    dir="ltr"
+                  >
+                    {user.email}
+                  </td>
+                  {scope === 'system' && (
+                    <td className={`border-t border-line px-3 py-2 ${user.active ? '' : 'opacity-50'}`}>
+                      {user.school_name}
+                    </td>
+                  )}
+                  <td className={`border-t border-line px-3 py-2 ${user.active ? '' : 'opacity-50'}`}>
                     {user.permission_level === 'full' ? 'הרשאה מלאה' : 'צפייה בלבד'}
                   </td>
                   <td className="border-t border-line px-3 py-2">
@@ -369,8 +379,9 @@ export function UsersPanel({ scope }: Props) {
                   type="button"
                   onClick={() => toggleActive(detailsUser)}
                   disabled={isUpdating}
-                  className="rounded-lg border border-line px-3 py-2 text-[13px] hover:bg-[#f2f0ea] disabled:opacity-60"
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[13px] hover:bg-[#f2f0ea] disabled:opacity-60"
                 >
+                  {detailsUser.active ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                   {detailsUser.active ? 'השבתת משתמש' : 'שחזור משתמש'}
                 </button>
                 {scope === 'system' && detailsUser.id !== myProfile?.id && (

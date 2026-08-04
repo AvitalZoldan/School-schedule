@@ -7,11 +7,8 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col gap-1 bg-ink px-4 py-[22px] text-[#e9e7e0]">
-      <div className="mb-[22px] text-[15px] font-bold tracking-[.3px] text-white">
-        מערך צוות
-        <span className="mt-0.5 block text-[11px] font-normal text-[#9aa0a8]">
-          מערכת שיבוץ בית-ספרית
-        </span>
+      <div className="mb-[22px] flex justify-center">
+        <img src="/logo-with-text.png" alt="מערך צוות — מערכת שיבוץ בית-ספרית" className="max-h-[100px] w-auto" />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">

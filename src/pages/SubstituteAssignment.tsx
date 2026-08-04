@@ -5,7 +5,7 @@ import { useEmployees } from '../hooks/useEmployees'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useDailyAuxiliaryAssignments, useAllAuxiliaryRosters } from '../hooks/useAuxiliarySystems'
 import { useSchoolSettings } from '../hooks/useSchoolSettings'
-import { useHolidays } from '../hooks/useHolidays'
+import { useHolidays, holidayDisablesDayPart } from '../hooks/useHolidays'
 import { addDays, formatDisplayDate, parseISODate, systemWeekday, toISODate, weekDates } from '../lib/dateUtils'
 import {
   auxiliaryOccupancy,
@@ -88,7 +88,7 @@ export default function SubstituteAssignment() {
   const { data, isLoading } = useDashboardData(schoolId, startDate, endDate)
   const { data: dailyAuxiliaryAssignments } = useDailyAuxiliaryAssignments(schoolId, startDate, endDate)
   const { data: holidays } = useHolidays(schoolId, startDate, endDate)
-  const holidaySet = useMemo(() => new Set((holidays ?? []).map((h) => h.holiday_date)), [holidays])
+  const holidaysByDate = useMemo(() => new Map((holidays ?? []).map((h) => [h.holiday_date, h])), [holidays])
 
   const employeesById = useMemo(
     () => new Map((allEmployees ?? []).map((e) => [e.id, e])),
@@ -117,13 +117,14 @@ export default function SubstituteAssignment() {
     if (!data || !ctx) return new Map<string, MissingItem[]>()
     const result = new Map<string, MissingItem[]>()
     for (const date of dates) {
-      if (holidaySet.has(date)) continue
+      const holiday = holidaysByDate.get(date)
       const wd = systemWeekday(parseISODate(date))
       const items: MissingItem[] = []
       for (const classData of data.classes) {
         for (const slot of classData.slots) {
           if (slot.weekday !== wd) continue
           if (slot.day_part === 'afternoon' && wd === FRIDAY_WD) continue
+          if (holiday && holidayDisablesDayPart(holiday, slot.day_part)) continue
           const status = resolveSlotStatus(slot, date, ctx)
           if (status.kind !== 'missing' && status.kind !== 'filled_sub') continue
           items.push({ slot, classId: classData.classRow.id, className: classData.classRow.name, date, status })
@@ -141,7 +142,7 @@ export default function SubstituteAssignment() {
       if (items.length > 0) result.set(date, items)
     }
     return result
-  }, [data, ctx, dates, holidaySet])
+  }, [data, ctx, dates, holidaysByDate])
 
   // "חורי מערכות עזר" (5.7-ג המורחב): לכל תאריך בטווח ולכל מערכת עזר עם show_in_missing, תפקיד
   // שאין לו כיסוי בפועל — או כי הוא לא מאויש בכלל בשיבוץ השבועי, או כי העובדת המשובצת נעדרת/

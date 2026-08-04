@@ -32,12 +32,17 @@ export function useSchoolSlotsForConflictCheck(
     queryKey: ['school-slots-conflict-check', schoolId, mode, status],
     enabled: !!schoolId,
     queryFn: async () => {
-      const { data: templates, error: templatesError } = await supabase
+      // עבור status='active' מתחשבים רק בתבניות הקבועות (valid_from is null) — תבנית
+      // מתוארכת (החלת טיוטה עם טווח תאריכים) היא שכבת-על זמנית נפרדת, ולא רלוונטית לבדיקת
+      // כפילות בעריכת השיבוץ הבסיסי הקבוע (BaseSchedule)
+      let query = supabase
         .from('schedule_templates')
         .select('id, class_id')
         .eq('school_id', schoolId!)
         .eq('mode', mode)
         .eq('status', status)
+      if (status === 'active') query = query.is('valid_from', null)
+      const { data: templates, error: templatesError } = await query
       if (templatesError) throw templatesError
 
       const templateIds = (templates ?? []).map((t) => t.id)
@@ -64,7 +69,10 @@ export function useSchoolSlotsForConflictCheck(
   })
 }
 
-// שולף את התבנית ה"active" היחידה עבור כיתה+מצב (אוכף גם ב-DB ע"י unique index)
+// שולף את התבנית ה"active" הקבועה (ללא טווח תאריכים) עבור כיתה+מצב — זו התבנית שנערכת
+// במסך "שיבוץ בסיסי" ושמשמשת כמקור/יעד ליצירת/החלת טיוטה. תבנית "active" מתוארכת
+// (valid_from/valid_to, ראו useDatedActiveTemplate) מהווה שכבת-על זמנית ואינה מוחזרת כאן.
+// אוכף גם ב-DB ע"י unique index (one_active_permanent_regular_template_per_class)
 export function useActiveTemplate(classId: number | undefined, mode: TemplateMode) {
   return useQuery({
     queryKey: ['active-template', classId, mode],
@@ -76,6 +84,29 @@ export function useActiveTemplate(classId: number | undefined, mode: TemplateMod
         .eq('class_id', classId!)
         .eq('mode', mode)
         .eq('status', 'active')
+        .is('valid_from', null)
+        .maybeSingle()
+      if (error) throw error
+      return data as ScheduleTemplateRow | null
+    },
+  })
+}
+
+// התבנית ה"active" המתוארכת (טווח תאריכים) הקיימת כרגע עבור כיתה+מצב, אם יש — שכבת-על
+// זמנית מעל התבנית הקבועה (ראו useActiveTemplate). לכל היותר טיוטה מתוארכת אחת מותרת
+// בו-זמנית (unique index one_active_dated_regular_template_per_class)
+export function useDatedActiveTemplate(classId: number | undefined, mode: TemplateMode) {
+  return useQuery({
+    queryKey: ['dated-active-template', classId, mode],
+    enabled: !!classId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('schedule_templates')
+        .select('*')
+        .eq('class_id', classId!)
+        .eq('mode', mode)
+        .eq('status', 'active')
+        .not('valid_from', 'is', null)
         .maybeSingle()
       if (error) throw error
       return data as ScheduleTemplateRow | null
@@ -232,6 +263,7 @@ interface CreateDraftInput {
 function invalidateScheduleQueries(queryClient: ReturnType<typeof useQueryClient>, classId: number, mode: TemplateMode) {
   queryClient.invalidateQueries({ queryKey: ['draft-template', classId, mode] })
   queryClient.invalidateQueries({ queryKey: ['active-template', classId, mode] })
+  queryClient.invalidateQueries({ queryKey: ['dated-active-template', classId, mode] })
   queryClient.invalidateQueries({ queryKey: ['classes'] })
   queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   queryClient.invalidateQueries({ queryKey: ['school-slots-conflict-check'] })
@@ -322,15 +354,48 @@ interface ApplyDraftInput {
   previousActiveTemplateId: number | null
   classId: number
   mode: TemplateMode
+  // טווח תאריכים אופציונלי (שניהם יחד או אף אחד): אם מוגדר, הטיוטה הופכת ל"תבנית מתוארכת"
+  // שמחליפה את התבנית הקבועה רק בטווח הזה, בלי למחוק אותה. בלעדיו — החלפה מלאה כרגיל.
+  validFrom?: string
+  validTo?: string
+  // התבנית המתוארכת הקיימת כרגע (אם יש) — יש לכל היותר טיוטה מתוארכת אחת בו-זמנית, ולכן
+  // החלה מתוארכת חדשה מחליפה (מוחקת) את הקודמת
+  previousDatedTemplateId?: number | null
 }
 
-// "החלת טיוטה" (5.5 באפיון): מוחקת לגמרי את התבנית הפעילה הקודמת ומעלה את הטיוטה
-// למצב active — מחליפה מיידית, בלי לשמור גרסה קודמת
+async function deleteTemplateWithSlots(templateId: number) {
+  const { data: oldSlots, error: oldSlotsError } = await supabase
+    .from('template_slots')
+    .select('id')
+    .eq('template_id', templateId)
+  if (oldSlotsError) throw oldSlotsError
+
+  const oldSlotIds = (oldSlots ?? []).map((s) => s.id)
+  if (oldSlotIds.length > 0) {
+    const { error: assignmentsError } = await supabase.from('daily_assignments').delete().in('slot_id', oldSlotIds)
+    if (assignmentsError) throw assignmentsError
+  }
+
+  const { error: slotsError } = await supabase.from('template_slots').delete().eq('template_id', templateId)
+  if (slotsError) throw slotsError
+
+  const { error: templateError } = await supabase.from('schedule_templates').delete().eq('id', templateId)
+  if (templateError) throw templateError
+}
+
+// "החלת טיוטה" (5.5 באפיון). שני מצבים:
+// - בלי טווח תאריכים: מוחקת לגמרי את התבנית הקבועה הקודמת ומעלה את הטיוטה למצבה — מחליפה
+//   מיידית וללא הגבלת זמן, בלי לשמור גרסה קודמת (ההתנהגות המקורית).
+// - עם טווח תאריכים: התבנית הקבועה **לא** נמחקת — הטיוטה עולה כתבנית "active" מתוארכת
+//   נפרדת, שכבת-על זמנית שמוצגת רק בטווח שנבחר (ראו useDashboardData). טיוטה מתוארכת קיימת
+//   קודמת (אם יש) נמחקת, כי מותרת רק אחת בו-זמנית.
 export function useApplyDraft() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: ApplyDraftInput) => {
-      if (input.previousActiveTemplateId) {
+      const isDated = !!input.validFrom && !!input.validTo
+
+      if (!isDated && input.previousActiveTemplateId) {
         // הטיוטה עצמה מצביעה על התבנית הישנה דרך based_on_template_id — יש לנתק את ההפניה
         // קודם, אחרת מחיקת schedule_templates תיכשל על מגבלת FK (וה-slots כבר יימחקו בפועל,
         // כי הקריאות הן נפרדות ולא בטרנזקציה אחת — בדיוק המצב שגרם לתבנית ריקה בעבר)
@@ -340,39 +405,27 @@ export function useApplyDraft() {
           .eq('id', input.draftTemplateId)
         if (unlinkError) throw unlinkError
 
-        // מ"מ שכבר שובצו אי-פעם לחורים של התבנית הישנה (daily_assignments) מפנים אליהם
-        // לפי slot_id — יש למחוק אותם קודם, אחרת מחיקת template_slots תיכשל על מגבלת FK
-        const { data: oldSlots, error: oldSlotsError } = await supabase
-          .from('template_slots')
-          .select('id')
-          .eq('template_id', input.previousActiveTemplateId)
-        if (oldSlotsError) throw oldSlotsError
+        await deleteTemplateWithSlots(input.previousActiveTemplateId)
+      }
 
-        const oldSlotIds = (oldSlots ?? []).map((s) => s.id)
-        if (oldSlotIds.length > 0) {
-          const { error: assignmentsError } = await supabase
-            .from('daily_assignments')
-            .delete()
-            .in('slot_id', oldSlotIds)
-          if (assignmentsError) throw assignmentsError
-        }
-
-        const { error: slotsError } = await supabase
-          .from('template_slots')
-          .delete()
-          .eq('template_id', input.previousActiveTemplateId)
-        if (slotsError) throw slotsError
-
-        const { error: templateError } = await supabase
+      if (isDated && input.previousDatedTemplateId) {
+        const { error: unlinkError } = await supabase
           .from('schedule_templates')
-          .delete()
-          .eq('id', input.previousActiveTemplateId)
-        if (templateError) throw templateError
+          .update({ based_on_template_id: null })
+          .eq('id', input.draftTemplateId)
+        if (unlinkError) throw unlinkError
+
+        await deleteTemplateWithSlots(input.previousDatedTemplateId)
       }
 
       const { error: activateError } = await supabase
         .from('schedule_templates')
-        .update({ status: 'active', applied_at: new Date().toISOString() })
+        .update({
+          status: 'active',
+          applied_at: new Date().toISOString(),
+          valid_from: isDated ? input.validFrom : null,
+          valid_to: isDated ? input.validTo : null,
+        })
         .eq('id', input.draftTemplateId)
       if (activateError) throw activateError
     },

@@ -1,8 +1,16 @@
 import { useState, type FormEvent } from 'react'
+import { useNamedItemForm } from '../hooks/useNamedItemForm'
+import { Pencil, Trash2, RotateCcw } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useCurrentSchoolId } from '../hooks/useSchool'
-import { useSchoolSettings, useUpdateSchoolSettings, type DashboardDefaultRange } from '../hooks/useSchoolSettings'
+import {
+  useSchoolSettings,
+  useUpdateSchoolSettings,
+  useStartNewYear,
+  type DashboardDefaultRange,
+} from '../hooks/useSchoolSettings'
 import { useSchoolHolidays, useSetHoliday, useRemoveHoliday } from '../hooks/useHolidays'
+import { ImportHolidaysModal } from '../components/employees/ImportHolidaysModal'
 import {
   useEmployeeCategoriesOverview,
   useCreateEmployeeCategory,
@@ -115,7 +123,128 @@ export default function Management() {
         <CategoriesSection schoolId={schoolId} canEdit={canEdit} />
 
         <HolidaysSection schoolId={schoolId} canEdit={canEdit} dateDisplayMode={dateDisplayMode} />
+
+        <NewYearSection schoolId={schoolId} canEdit={canEdit} />
       </div>
+    </div>
+  )
+}
+
+const NEW_YEAR_CONFIRM_TEXT = 'איפוס שנה'
+
+// "התחלת שנה חדשה" (אזור סכנה): מארכבת (סימון archived_at בלבד, לא DELETE) תבניות שיבוץ,
+// חופשות, קייטנות, ימי חופש, שיבוצים והיעדרויות יומיים, וכן את ההיסטוריה של בית הספר — כדי
+// שאפשר יהיה להתחיל שנה נקייה בלי לגרור נתונים משנה לשנה. הנתונים לא באמת נמחקים מה-DB (נשארים
+// שם עם archived_at, ומוסתרים מהאפליקציה ע"י ה-RLS), אבל מבחינת המשתמשת זו פעולה שלא הופכים
+// מתוך המסך — ראו RPC start_new_year. עדיין דורשת הקלדת מילת אישור מפורשת ולא רק "אישור/ביטול".
+function NewYearSection({ schoolId, canEdit }: { schoolId: number | undefined; canEdit: boolean }) {
+  const startNewYear = useStartNewYear()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [resultError, setResultError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  function openModal() {
+    setConfirmText('')
+    setResultError(null)
+    setDone(false)
+    setModalOpen(true)
+  }
+
+  async function handleConfirm() {
+    if (!schoolId || confirmText !== NEW_YEAR_CONFIRM_TEXT) return
+    setResultError(null)
+    try {
+      await startNewYear.mutateAsync(schoolId)
+      setDone(true)
+    } catch {
+      setResultError('האיפוס נכשל. נסי שוב.')
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-danger/40 bg-panel p-[18px]">
+      <div className="mb-1 text-[13px] font-bold text-danger">התחלת שנה חדשה</div>
+      <div className="mb-3 text-[12px] text-ink-soft">
+        מסתירה מהמערכת את נתוני השנה החולפת: תבנית השיבוץ השבועית, חופשות, קייטנות, ימי חופש,
+        שיבוצים והיעדרויות יומיים, וההיסטוריה. רשימת העובדות, הכיתות, והגדרות בית הספר (תפקידים,
+        קטגוריות וכו') לא נפגעות. הפעולה אינה ניתנת לביטול מתוך המסך.
+      </div>
+
+      {canEdit && (
+        <button
+          type="button"
+          onClick={openModal}
+          className="rounded-lg border border-danger px-3 py-2 text-[13px] font-semibold text-danger transition-opacity hover:opacity-80"
+        >
+          התחלת שנה חדשה…
+        </button>
+      )}
+
+      {!canEdit && (
+        <div className="text-[11.5px] text-ink-soft">משתמשת בהרשאת צפייה בלבד — אין אפשרות לבצע פעולה זו.</div>
+      )}
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-[420px] rounded-xl border border-line bg-panel p-6 shadow-lg">
+            {done ? (
+              <>
+                <h2 className="mb-3 text-lg font-bold">בוצע</h2>
+                <div className="mb-4 text-[13px] text-ink-soft">
+                  נתוני השנה החולפת הוסתרו מהמערכת. אפשר להתחיל להגדיר את תבנית השיבוץ לשנה החדשה.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="w-full rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                >
+                  סגירה
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="mb-3 text-lg font-bold text-danger">התחלת שנה חדשה</h2>
+                <div className="mb-4 text-[13px] leading-relaxed text-ink">
+                  פעולה זו תסתיר מהמערכת את תבנית השיבוץ, חופשות, קייטנות, ימי חופש, שיבוצים
+                  והיעדרויות יומיים, וההיסטוריה — לא ניתן לבטל מתוך המסך. כדי לאשר, הקלידי{' '}
+                  <span className="font-bold">"{NEW_YEAR_CONFIRM_TEXT}"</span> בתיבה למטה.
+                </div>
+                <input
+                  autoFocus
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  className="mb-3 w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-danger"
+                />
+
+                {resultError && (
+                  <div className="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger">
+                    {resultError}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(false)}
+                    className="flex-1 rounded-lg border border-line px-3 py-2 text-[13px] hover:bg-[#f2f0ea]"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={confirmText !== NEW_YEAR_CONFIRM_TEXT || startNewYear.isPending}
+                    className="flex-1 rounded-lg bg-danger px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {startNewYear.isPending ? 'מבצעת…' : 'התחלת שנה חדשה'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -206,25 +335,10 @@ function RoleTypesSection({ schoolId, canEdit }: { schoolId: number | undefined;
   const updateDefault = useUpdateRoleTypeDefault()
   const confirm = useConfirm()
 
-  const [name, setName] = useState('')
-  const [formError, setFormError] = useState<string | null>(null)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  const { name, setName, formError, handleSubmit } = useNamedItemForm('יש להזין שם תפקיד', async (trimmed) => {
     if (!schoolId) return
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setFormError('יש להזין שם תפקיד')
-      return
-    }
-    try {
-      await createRoleType.mutateAsync({ schoolId, name: trimmed, sortOrder: (roleTypes?.length ?? 0) + 1 })
-      setName('')
-      setFormError(null)
-    } catch {
-      setFormError('השמירה נכשלה. נסי שוב.')
-    }
-  }
+    await createRoleType.mutateAsync({ schoolId, name: trimmed, sortOrder: (roleTypes?.length ?? 0) + 1 })
+  })
 
   function renameRoleType(rt: RoleTypeWithDefaults, newName: string) {
     if (!schoolId) return
@@ -309,9 +423,10 @@ function RoleTypesSection({ schoolId, canEdit }: { schoolId: number | undefined;
               {roleTypes.map((rt) => {
                 const morning = rt.defaults.find((d) => d.day_part === 'morning')
                 const afternoon = rt.defaults.find((d) => d.day_part === 'afternoon')
+                const fadeClass = rt.active ? '' : 'opacity-50'
                 return (
-                  <tr key={rt.id} className={`border-t border-line ${rt.active ? '' : 'opacity-50'}`}>
-                    <td className="py-1.5">
+                  <tr key={rt.id} className="border-t border-line">
+                    <td className={`py-1.5 ${fadeClass}`}>
                       <input
                         defaultValue={rt.name}
                         disabled={!canEdit}
@@ -322,9 +437,13 @@ function RoleTypesSection({ schoolId, canEdit }: { schoolId: number | undefined;
                     </td>
                     {(['morning', 'afternoon'] as const).flatMap((dayPart) => {
                       const def = dayPart === 'morning' ? morning : afternoon
-                      if (!def) return [<td key={`${dayPart}-count`} />, <td key={`${dayPart}-crit`} />]
+                      if (!def)
+                        return [
+                          <td key={`${dayPart}-count`} className={fadeClass} />,
+                          <td key={`${dayPart}-crit`} className={fadeClass} />,
+                        ]
                       return [
-                        <td key={`${dayPart}-count`} className="py-1.5">
+                        <td key={`${dayPart}-count`} className={`py-1.5 ${fadeClass}`}>
                           <input
                             type="number"
                             min={0}
@@ -334,7 +453,7 @@ function RoleTypesSection({ schoolId, canEdit }: { schoolId: number | undefined;
                             className="mx-auto block w-14 rounded-lg border border-line bg-white px-2 py-1 text-center text-[13px] outline-none focus:border-accent disabled:opacity-60"
                           />
                         </td>,
-                        <td key={`${dayPart}-crit`} className="py-1.5">
+                        <td key={`${dayPart}-crit`} className={`py-1.5 ${fadeClass}`}>
                           <select
                             disabled={!canEdit}
                             value={def.criticality}
@@ -355,9 +474,11 @@ function RoleTypesSection({ schoolId, canEdit }: { schoolId: number | undefined;
                         <button
                           type="button"
                           onClick={() => toggleActive(rt)}
-                          className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                          title={rt.active ? 'השבתה' : 'שחזור'}
+                          aria-label={rt.active ? 'השבתה' : 'שחזור'}
+                          className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                         >
-                          {rt.active ? 'השבתה' : 'שחזור'}
+                          {rt.active ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                         </button>
                       )}
                     </td>
@@ -382,35 +503,21 @@ function CategoriesSection({ schoolId, canEdit }: { schoolId: number | undefined
   const updateCategory = useUpdateEmployeeCategory()
   const confirm = useConfirm()
 
-  const [name, setName] = useState('')
   const [color, setColor] = useState(DEFAULT_CATEGORY_COLOR)
-  const [formError, setFormError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState(DEFAULT_CATEGORY_COLOR)
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  const { name, setName, formError, handleSubmit } = useNamedItemForm('יש להזין שם קטגוריה', async (trimmed) => {
     if (!schoolId) return
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setFormError('יש להזין שם קטגוריה')
-      return
-    }
-    try {
-      await createCategory.mutateAsync({
-        schoolId,
-        name: trimmed,
-        color,
-        sortOrder: (categories?.length ?? 0) + 1,
-      })
-      setName('')
-      setColor(DEFAULT_CATEGORY_COLOR)
-      setFormError(null)
-    } catch {
-      setFormError('השמירה נכשלה. נסי שוב.')
-    }
-  }
+    await createCategory.mutateAsync({
+      schoolId,
+      name: trimmed,
+      color,
+      sortOrder: (categories?.length ?? 0) + 1,
+    })
+    setColor(DEFAULT_CATEGORY_COLOR)
+  })
 
   function startEdit(category: EmployeeCategoryRow) {
     setEditingId(category.id)
@@ -515,11 +622,9 @@ function CategoriesSection({ schoolId, canEdit }: { schoolId: number | undefined
             ) : (
               <li
                 key={c.id}
-                className={`flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[13px] ${
-                  c.active ? '' : 'opacity-50'
-                }`}
+                className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[13px]"
               >
-                <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 ${c.active ? '' : 'opacity-50'}`}>
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
                   <span className="font-medium">{c.name}</span>
                   {!c.active && <span className="text-[11px] text-ink-soft">(לא פעילה)</span>}
@@ -529,16 +634,20 @@ function CategoriesSection({ schoolId, canEdit }: { schoolId: number | undefined
                     <button
                       type="button"
                       onClick={() => startEdit(c)}
-                      className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                      title="עריכה"
+                      aria-label="עריכה"
+                      className={`rounded-md border border-line p-1.5 hover:bg-[#f2f0ea] ${c.active ? '' : 'opacity-50'}`}
                     >
-                      עריכה
+                      <Pencil size={14} />
                     </button>
                     <button
                       type="button"
                       onClick={() => toggleActive(c)}
-                      className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                      title={c.active ? 'השבתה' : 'שחזור'}
+                      aria-label={c.active ? 'השבתה' : 'שחזור'}
+                      className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                     >
-                      {c.active ? 'השבתה' : 'שחזור'}
+                      {c.active ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                     </button>
                   </div>
                 )}
@@ -553,6 +662,14 @@ function CategoriesSection({ schoolId, canEdit }: { schoolId: number | undefined
   )
 }
 
+type HolidayDayPartMode = 'full' | 'morning' | 'afternoon'
+
+function holidayDayPartMode(h: { includes_morning: boolean; includes_afternoon: boolean }): HolidayDayPartMode {
+  if (h.includes_morning) return 'morning'
+  if (h.includes_afternoon) return 'afternoon'
+  return 'full'
+}
+
 function HolidaysSection({
   schoolId,
   canEdit,
@@ -563,13 +680,28 @@ function HolidaysSection({
   dateDisplayMode: DateDisplayMode
 }) {
   const { data: holidays, isLoading } = useSchoolHolidays(schoolId)
+  const { data: settings } = useSchoolSettings(schoolId)
   const setHoliday = useSetHoliday()
   const removeHoliday = useRemoveHoliday()
   const confirm = useConfirm()
 
+  const morningLabel = settings?.morning_label ?? 'בוקר'
+  const afternoonLabel = settings?.afternoon_label ?? 'צהריים'
+
+  const [showAddModal, setShowAddModal] = useState(false)
   const [date, setDate] = useState('')
   const [label, setLabel] = useState('')
+  const [dayPartMode, setDayPartMode] = useState<HolidayDayPartMode>('full')
   const [formError, setFormError] = useState<string | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+
+  function openAddModal() {
+    setDate('')
+    setLabel('')
+    setDayPartMode('full')
+    setFormError(null)
+    setShowAddModal(true)
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -579,9 +711,14 @@ function HolidaysSection({
       return
     }
     try {
-      await setHoliday.mutateAsync({ schoolId, date, label: label.trim() || null })
-      setDate('')
-      setLabel('')
+      await setHoliday.mutateAsync({
+        schoolId,
+        date,
+        label: label.trim() || null,
+        includesMorning: dayPartMode === 'morning',
+        includesAfternoon: dayPartMode === 'afternoon',
+      })
+      setShowAddModal(false)
     } catch {
       setFormError('השמירה נכשלה. נסי שוב.')
     }
@@ -600,42 +737,28 @@ function HolidaysSection({
     <div className="rounded-xl border border-line bg-panel p-[18px]">
       <div className="mb-1 text-[13px] font-bold">ימי חופש</div>
       <div className="mb-3 text-[12px] text-ink-soft">
-        תאריך שמסומן כיום חופש מוצג כלא-פעיל בלוח הבקרה, ומוסתר לגמרי ממסך "שיבוץ
-        מ"מ".
+        תאריך שמסומן כיום חופש מלא מוצג כלא-פעיל בלוח הבקרה, ומוסתר לגמרי ממסך "שיבוץ מ"מ".
+        לחלופין ניתן לסמן "יום קצר" — רק חלק-היום שלא פעיל באותו יום ({morningLabel}/
+        {afternoonLabel}) יינטרל, וחלק-היום השני יישאר פעיל כרגיל.
       </div>
 
       {canEdit && (
-        <form onSubmit={handleSubmit} className="mb-4 flex flex-wrap items-end gap-2 print:hidden">
-          <label className="block">
-            <span className="mb-1 block text-[12px] text-ink-soft">תאריך</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
-            />
-          </label>
-          <label className="block flex-1 min-w-[140px]">
-            <span className="mb-1 block text-[12px] text-ink-soft">תיאור (רשות)</span>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="למשל: ראש השנה"
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-accent"
-            />
-          </label>
+        <div className="mb-4 flex flex-wrap gap-2 print:hidden">
           <button
-            type="submit"
-            disabled={setHoliday.isPending}
-            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            type="button"
+            onClick={openAddModal}
+            className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
           >
-            {setHoliday.isPending ? 'מוסיפה…' : '+ הוספת יום חופש'}
+            + הוספת יום חופש
           </button>
-        </form>
-      )}
-
-      {formError && (
-        <div className="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger">{formError}</div>
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] hover:bg-[#f2f0ea]"
+          >
+            ייבוא מקובץ
+          </button>
+        </div>
       )}
 
       {isLoading ? (
@@ -653,14 +776,21 @@ function HolidaysSection({
                   {formatDisplayDate(parseISODate(h.holiday_date), dateDisplayMode)}
                 </span>
                 {h.label && <span className="mr-2 text-ink-soft">— {h.label}</span>}
+                {holidayDayPartMode(h) !== 'full' && (
+                  <span className="mr-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">
+                    יום קצר — {holidayDayPartMode(h) === 'morning' ? morningLabel : afternoonLabel} בלבד
+                  </span>
+                )}
               </div>
               {canEdit && (
                 <button
                   type="button"
                   onClick={() => handleRemove(h.holiday_date, h.label)}
-                  className="rounded-md border border-line px-2.5 py-1 text-[12px] hover:bg-[#f2f0ea]"
+                  title="ביטול"
+                  aria-label="ביטול"
+                  className="rounded-md border border-line p-1.5 hover:bg-[#f2f0ea]"
                 >
-                  ביטול
+                  <Trash2 size={14} />
                 </button>
               )}
             </li>
@@ -668,6 +798,80 @@ function HolidaysSection({
         </ul>
       ) : (
         <div className="text-[12.5px] text-ink-soft">אין ימי חופש מוגדרים.</div>
+      )}
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-[420px] rounded-xl border border-line bg-panel p-6 shadow-lg">
+            <h2 className="mb-4 text-lg font-bold">הוספת יום חופש</h2>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+              <label className="block">
+                <span className="mb-1 block text-[13px] text-ink-soft">תאריך</span>
+                <input
+                  autoFocus
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[13px] text-ink-soft">תיאור (רשות)</span>
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="למשל: ראש השנה"
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[13px] text-ink-soft">סוג</span>
+                <select
+                  value={dayPartMode}
+                  onChange={(e) => setDayPartMode(e.target.value as HolidayDayPartMode)}
+                  className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[14px] outline-none focus:border-accent"
+                >
+                  <option value="full">יום חופש מלא</option>
+                  <option value="morning">יום קצר — {morningLabel} בלבד פעיל</option>
+                  <option value="afternoon">יום קצר — {afternoonLabel} בלבד פעיל</option>
+                </select>
+              </label>
+
+              {formError && (
+                <div className="rounded-lg bg-danger-soft px-3 py-2 text-[13px] text-danger">{formError}</div>
+              )}
+
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 rounded-lg border border-line px-3 py-2 text-[13px] hover:bg-[#f2f0ea]"
+                >
+                  ביטול
+                </button>
+                <button
+                  type="submit"
+                  disabled={setHoliday.isPending}
+                  className="flex-1 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {setHoliday.isPending ? 'שומרת…' : 'שמירה'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && schoolId && (
+        <ImportHolidaysModal
+          schoolId={schoolId}
+          existingHolidays={holidays ?? []}
+          morningLabel={morningLabel}
+          afternoonLabel={afternoonLabel}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
     </div>
   )
